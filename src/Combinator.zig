@@ -211,6 +211,21 @@ pub fn Combinator(comptime UserState: type) type {
             return Result([]PValue).success(try array.toOwnedSlice(), s);
         }
 
+        pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime FValue: type, follow: anytype) anyerror!Result(PValue) {
+            switch (try runParser(stream, allocator, state, PValue, parser)) {
+                .Result => |res| {
+                    switch (try runParser(res.rest, allocator, state, FValue, follow)) {
+                        .Result => return Result(PValue).failure(std.ArrayList(u8).init(allocator), res.rest),
+                        .Error => |err| {
+                            err.msg.deinit();
+                            return Result(PValue).success(res.value, res.rest);
+                        },
+                    }
+                },
+                .Error => |err| return Result(PValue).failure(err.msg, err.rest),
+            }
+        }
+
         fn lscan(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
             return switch (try runParser(stream, allocator, state, PValue, parser)) {
                 .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
