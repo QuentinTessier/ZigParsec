@@ -1,5 +1,7 @@
 const std = @import("std");
+pub const ExampleMath = @import("examples/math.zig");
 
+// TODO: Make UserState compatible with void
 pub fn Parser(comptime UserState: type) type {
     return struct {
         pub const Stream = @import("Stream.zig");
@@ -52,13 +54,11 @@ pub fn Parser(comptime UserState: type) type {
 
         pub inline fn runParser(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime T: type, p: anytype) anyerror!Result(T) {
             const ParserWrapperType: type = @TypeOf(p);
-            if (@typeInfo(ParserWrapperType) == .Struct) {
-                return @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args);
-            } else if (@typeInfo(ParserWrapperType) == .Fn) {
-                return @call(.auto, p, .{ stream, allocator, state });
-            } else {
-                unreachable;
-            }
+            return switch (@typeInfo(ParserWrapperType)) {
+                .Struct => @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args),
+                .Fn => @call(.auto, p, .{ stream, allocator, state }),
+                else => unreachable,
+            };
         }
 
         pub inline fn label(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime Value: type, p: anytype, str: []const u8) anyerror!Result(Value) {

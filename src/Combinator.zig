@@ -58,7 +58,7 @@ pub fn Combinator(comptime UserState: type) type {
             var error_msg = std.ArrayList(u8).init(allocator);
             var writer = error_msg.writer();
             try writer.print("{}: Choice Parser:\n", .{stream});
-            for (parsers) |p| {
+            inline for (parsers) |p| {
                 const r = try runParser(stream, allocator, state, Value, p);
                 switch (r) {
                     .Result => {
@@ -66,7 +66,7 @@ pub fn Combinator(comptime UserState: type) type {
                         return r;
                     },
                     .Error => |err| {
-                        try writer.print("\t{s}\n", .{err});
+                        try writer.print("\t{s}\n", .{err.msg.items});
                         err.msg.deinit();
                     },
                 }
@@ -209,6 +209,48 @@ pub fn Combinator(comptime UserState: type) type {
             }
 
             return Result([]PValue).success(try array.toOwnedSlice(), s);
+        }
+
+        fn lscan(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
+            return switch (try runParser(stream, allocator, state, PValue, parser)) {
+                .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
+                .Error => |err| Result(PValue).failure(err.msg, err.rest),
+            };
+        }
+
+        fn lrest(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
+            switch (try runParser(stream, allocator, state, OValue, op)) {
+                .Result => |res| {
+                    const operator_fnc: *const fn (std.mem.Allocator, PValue, PValue) anyerror!PValue = res.value;
+                    switch (try lscan(res.rest, allocator, state, PValue, parser, OValue, op)) {
+                        .Result => |res2| return Result(PValue).success(try operator_fnc(allocator, x, res2.value), res2.rest),
+                        .Error => |err| {
+                            err.msg.deinit();
+                        },
+                    }
+                },
+                .Error => |err| {
+                    err.msg.deinit();
+                },
+            }
+            return Result(PValue).success(x, stream);
+        }
+
+        pub fn chainl1(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
+            return switch (try lscan(stream, allocator, state, PValue, parser, OValue, op)) {
+                .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
+                .Error => |err| Result(PValue).failure(err.msg, err.rest),
+            };
+        }
+
+        pub fn chainl(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
+            switch (try chainl1(stream, allocator, state, PValue, parser, OValue, op)) {
+                .Result => |res| return Result(PValue).success(res.value, res.rest),
+                .Error => |err| {
+                    err.msg.deinit();
+                    return Result(PValue).success(x, err.rest);
+                },
+            }
         }
     };
 }
