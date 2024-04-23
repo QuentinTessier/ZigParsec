@@ -95,7 +95,12 @@ pub fn Combinator(comptime UserState: type) type {
             const r = try runParser(stream, allocator, state, Value, parser);
             return switch (r) {
                 .Result => r,
-                .Error => |err| Result(Value).success(x, err.rest),
+                .Error => |err| blk: {
+                    if (stream.diff(err.rest).len == 0)
+                        break :blk Result(Value).success(x, err.rest)
+                    else
+                        break :blk r;
+                },
             };
         }
 
@@ -103,8 +108,107 @@ pub fn Combinator(comptime UserState: type) type {
             const r = try runParser(stream, allocator, state, Value, parser);
             return switch (r) {
                 .Result => r,
-                .Error => |err| Result(Value).success(null, err.rest),
+                .Error => |err| blk: {
+                    if (stream.diff(err.rest).len == 0)
+                        break :blk Result(Value).success(null, err.rest)
+                    else
+                        break :blk r;
+                },
             };
+        }
+
+        pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime Value: type, parser: anytype) anyerror!Result(void) {
+            const r = try runParser(stream, allocator, state, Value, parser);
+            return switch (r) {
+                .Result => |res| Result(void).success(void{}, res.rest),
+                .Error => |err| blk: {
+                    if (stream.diff(err.rest).len == 0)
+                        break :blk Result(Value).success(void{}, err.rest)
+                    else
+                        break :blk r;
+                },
+            };
+        }
+
+        pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
+            var array = std.ArrayList(PValue).init(allocator);
+            var s = stream;
+
+            switch (try runParser(s, allocator, state, PValue, parser)) {
+                .Result => |res| {
+                    try array.append(res.value);
+                    s = res.rest;
+                },
+                .Error => |err| {
+                    err.msg.deinit();
+                    return Result([]PValue).success(&.{}, err.rest);
+                },
+            }
+
+            while (run: {
+                switch (try runParser(s, allocator, state, SValue, sep)) {
+                    .Result => |res| {
+                        s = res.rest;
+                        break :run true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :run false;
+                    },
+                }
+            }) {
+                switch (try runParser(s, allocator, state, PValue, parser)) {
+                    .Result => |res| {
+                        try array.append(res.value);
+                        s = res.rest;
+                    },
+                    .Error => |err| {
+                        array.deinit();
+                        return Result([]PValue).failure(err.msg, err.rest);
+                    },
+                }
+            }
+
+            return Result([]PValue).success(try array.toOwnedSlice(), s);
+        }
+
+        pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
+            var array = std.ArrayList(PValue).init(allocator);
+            var s = stream;
+
+            switch (try runParser(s, allocator, state, PValue, parser)) {
+                .Result => |res| {
+                    try array.append(res.value);
+                    s = res.rest;
+                },
+                .Error => |err| return Result([]PValue).failure(err.msg, err.rest),
+            }
+
+            while (run: {
+                switch (try runParser(s, allocator, state, SValue, sep)) {
+                    .Result => |res| {
+                        s = res.rest;
+                        break :run true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :run false;
+                    },
+                }
+            }) {
+                switch (try runParser(s, allocator, state, PValue, parser)) {
+                    .Result => |res| {
+                        try array.append(res.value);
+                        s = res.rest;
+                    },
+                    .Error => |err| {
+                        array.deinit();
+                        return Result([]PValue).failure(err.msg, err.rest);
+                    },
+                }
+            }
+
+            return Result([]PValue).success(try array.toOwnedSlice(), s);
         }
     };
 }
