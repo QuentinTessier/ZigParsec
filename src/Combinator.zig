@@ -1,9 +1,9 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
+const Result = @import("Result.zig").Result;
 
 pub fn Combinator(comptime UserState: type) type {
     return struct {
-        const Result = @import("Parser.zig").Parser(UserState).Result;
         const runParser = @import("Parser.zig").Parser(UserState).runParser;
 
         pub fn many(stream: Stream, allocator: std.mem.Allocator, state: *UserState, comptime Value: type, p: anytype) anyerror!Result([]Value) {
