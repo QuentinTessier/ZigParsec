@@ -5,10 +5,6 @@ pub const MakeUserStateType = @import("UserState.zig").MakeUserStateType;
 pub const Result = @import("Result.zig").Result;
 pub const ParseError = @import("Result.zig").ParseError;
 
-// TODO: Make ZigParsecState compatible with void
-// ----- Current support is a bit weird, need to passe a "non constant pointer to a void value"
-// ----- const void_value: void = void{};
-// ----- Parser(void).Char.symbol(s, allocator, &void_value, 'a');
 // TODO: Own impl of https://hackage.haskell.org/package/parsec-3.1.17.0/docs/Text-Parsec-Expr.html
 // TODO: map = *const fn (Stream, Allocator, *State, PType, Parser(PType), TType, *cosnt fn (Allocator, PType) !TType) !Result(TType)
 // ----- Useful to implement integer and float parser, eg: Parser.Char.digits().map(struct { pub fn map_fn(Allocator, []u8) { return std.fmt.parseInt()}});
@@ -18,6 +14,7 @@ pub const Stream = @import("Stream.zig");
 pub const Char = @import("Char.zig");
 pub const Combinator = @import("Combinator.zig");
 pub const Expression = @import("Expression.zig").BuildExprParser;
+pub const Language = @import("Language.zig");
 
 pub fn pure(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(void) {
     return Result(void).success(void{}, stream);
@@ -54,4 +51,11 @@ pub inline fn label(stream: Stream, allocator: std.mem.Allocator, state: *ZigPar
 
 pub inline fn ret(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState, comptime Value: type, x: Value) anyerror!Result(Value) {
     return Result(Value).success(x, stream);
+}
+
+pub inline fn map(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime From: type, fParser: anytype, comptime To: type, tFnc: *const fn (std.mem.Allocator, From) anyerror!To) anyerror!Result(To) {
+    return switch (try runParser(stream, allocator, state, From, fParser)) {
+        .Result => |res| Result(To).success(try tFnc(allocator, res.value), res.rest),
+        .Error => |err| Result(To).failure(err.msg, err.rest),
+    };
 }

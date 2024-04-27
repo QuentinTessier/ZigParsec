@@ -56,6 +56,23 @@ pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecStat
     return Result([]Value).success(try array.toOwnedSlice(), s);
 }
 
+pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime Value: type, p: anytype) anyerror!Result(void) {
+    var s = stream;
+    while (true) {
+        const r = try runParser(s, allocator, state, Value, p);
+        switch (r) {
+            .Result => |res| {
+                s = res.rest;
+            },
+            .Error => |err| {
+                err.msg.deinit();
+                break;
+            },
+        }
+    }
+    return Result([]Value).success(void{}, s);
+}
+
 pub fn choice(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime Value: type, parsers: anytype) anyerror!Result(Value) {
     var error_msg = std.ArrayList(u8).init(allocator);
     var writer = error_msg.writer();
