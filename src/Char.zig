@@ -260,6 +260,16 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
+pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(void) {
+    if (stream.isEOF()) return Result(void).success(void{}, stream);
+    const start = stream.currentLocation.index;
+    var end = start;
+
+    while (end < stream.data.len and std.ascii.isWhitespace(stream.data[end])) : (end += 1) {}
+
+    return Result(void).success(void{}, stream.eat(end - start));
+}
+
 pub fn string(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, str: []const u8) anyerror!Result([]const u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);

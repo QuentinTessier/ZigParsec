@@ -1,5 +1,6 @@
 const std = @import("std");
-const Parser = @import("Parser.zig").Parser(u32);
+const Parser = @import("Parser.zig");
+const Expression = @import("./examples/Expression.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -7,25 +8,9 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    var userState: u32 = 0;
-    const s = Parser.Stream.init("(abc)", null);
+    var state: Parser.ZigParsecState = .{ .extensions = null };
+    try Expression.makeStateExtension(allocator, &state);
+    defer Expression.destroyStateExtension(allocator, &state);
 
-    switch (try Parser.Combinator.between(
-        s,
-        allocator,
-        &userState,
-        .{ u8, []const u8, u8 },
-        .{ .parser = Parser.Char.symbol, .args = .{'('} },
-        .{ .parser = Parser.Char.string, .args = .{"abc"} },
-        .{ .parser = Parser.Char.symbol, .args = .{')'} },
-    )) {
-        .Result => |res| {
-            std.log.info("Success with {s}", .{res.value});
-            //allocator.free(res.value);
-        },
-        .Error => |err| {
-            std.log.err("{s}", .{err.msg.items});
-            err.msg.deinit();
-        },
-    }
+    //const s = Parser.Stream.init("1+-2", null);
 }

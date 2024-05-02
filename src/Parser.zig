@@ -5,16 +5,16 @@ pub const MakeUserStateType = @import("UserState.zig").MakeUserStateType;
 pub const Result = @import("Result.zig").Result;
 pub const ParseError = @import("Result.zig").ParseError;
 
-// TODO: Own impl of https://hackage.haskell.org/package/parsec-3.1.17.0/docs/Text-Parsec-Expr.html
-// TODO: map = *const fn (Stream, Allocator, *State, PType, Parser(PType), TType, *cosnt fn (Allocator, PType) !TType) !Result(TType)
-// ----- Useful to implement integer and float parser, eg: Parser.Char.digits().map(struct { pub fn map_fn(Allocator, []u8) { return std.fmt.parseInt()}});
 // TODO: Basic Language parser (integer, float, keyword, identifier, ...)
 // TODO: Tests
+// TODO: Change the way we can eat whitespace.
+// ----- Stream.eatWhitespace isn't the way, works for simple parser, but becomes anoying when trying to do more complicated things
+// ----- See Combinator.skipMany => create Char.skipeManySpaces ...
 pub const Stream = @import("Stream.zig");
 pub const Char = @import("Char.zig");
 pub const Combinator = @import("Combinator.zig");
-pub const Expression = @import("Expression.zig").BuildExprParser;
 pub const Language = @import("Language.zig");
+pub const Expression = @import("Expression.zig").BuildExpressionParser;
 
 pub fn pure(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(void) {
     return Result(void).success(void{}, stream);
@@ -29,9 +29,14 @@ pub fn noop(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) an
 pub inline fn runParser(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime T: type, p: anytype) anyerror!Result(T) {
     const ParserWrapperType: type = @TypeOf(p);
     return switch (@typeInfo(ParserWrapperType)) {
-        .Struct => @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args),
+        .Struct => |s| if (s.is_tuple) @call(.auto, p[0], .{ stream, allocator, state } ++ p[1]) else @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args),
         .Fn => @call(.auto, p, .{ stream, allocator, state }),
-        else => unreachable,
+        else => blk: {
+            var msg = std.ArrayList(u8).init(allocator);
+            var writer = msg.writer();
+            try writer.print("Invalid Parser given with type: {s}", .{@typeName(p)});
+            break :blk Result(T).failure(msg, stream);
+        },
     };
 }
 

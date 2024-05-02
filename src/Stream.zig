@@ -62,17 +62,6 @@ pub fn eat(self: Stream, length: usize) Stream {
             else => new.currentLocation.character += 1,
         }
     }
-
-    while (self.eatWhitespace and i < self.data.len and std.ascii.isWhitespace(self.data[i])) : (i += 1) {
-        switch (self.data[i]) {
-            '\n' => {
-                new.currentLocation.line += 1;
-                new.currentLocation.character = 1;
-            },
-            else => new.currentLocation.character += 1,
-        }
-    }
-
     new.currentLocation.index = i;
 
     return new;
