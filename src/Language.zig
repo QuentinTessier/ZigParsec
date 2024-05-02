@@ -49,7 +49,7 @@ pub fn operator(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecS
                     []const u8,
                     .{ Parser.Char.string, .{symbol} },
                     u8,
-                    .{ Parser.Char.oneOf, followed },
+                    .{ Parser.Char.oneOf, .{followed} },
                 );
             },
             .Error => unreachable,
