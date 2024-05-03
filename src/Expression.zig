@@ -44,24 +44,25 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
         };
 
         pub const Operators = struct {
-            infixOp: []const InfixOperatorParser,
-            prefixOp: []const PrefixOperatorParser,
+            infixOp: []InfixOperatorParser,
+            prefixOp: []PrefixOperatorParser,
 
             pub fn createStateExtension(allocator: std.mem.Allocator, infixOp: []const InfixOperatorParser, prefixOp: []const PrefixOperatorParser) !*Operators {
                 const op = try allocator.create(Operators);
                 op.* = .{
-                    .infixOp = infixOp,
-                    .prefixOp = prefixOp,
+                    .infixOp = try allocator.dupe(InfixOperatorParser, infixOp),
+                    .prefixOp = try allocator.dupe(PrefixOperatorParser, prefixOp),
                 };
                 return op;
             }
 
             pub fn destroyStateExtension(allocator: std.mem.Allocator, state: *ZigParsecState) void {
                 const ptr = state.getExtension(Operators).?;
+                allocator.free(ptr.infixOp);
+                allocator.free(ptr.prefixOp);
                 allocator.destroy(ptr);
             }
         };
-
         pub const InfixOperatorParser = *const fn (Stream, std.mem.Allocator, *ZigParsecState) anyerror!Result(InfixOperator);
         pub const InfixOperatorBuilder = *const fn (std.mem.Allocator, ExprType, ExprType) anyerror!ExprType;
 
@@ -117,91 +118,6 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
                 }.inlineParser;
             }
         };
-
-        pub fn makeInfixOperator(
-            comptime symbol: []const u8,
-            comptime notFollowedBy: anytype,
-            comptime precedence: OperatorPrecedence,
-            comptime builder: InfixOperatorBuilder,
-        ) InfixOperatorParser {
-            return struct {
-                pub fn inlineParser(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState) anyerror!Result(InfixOperator) {
-                    switch (try Parser.Char.spaces(stream, allocator, state)) {
-                        .Result => |res| {
-                            if (@TypeOf(notFollowedBy) != type) {
-                                return switch (try Parser.Combinator.notFollowedBy(
-                                    res.rest,
-                                    allocator,
-                                    state,
-                                    []const u8,
-                                    .{ .parser = Parser.Char.string, .args = .{symbol} },
-                                    u8,
-                                    notFollowedBy,
-                                )) {
-                                    .Result => |res1| Result(InfixOperator).success(InfixOperator{
-                                        .symbol = symbol,
-                                        .prec = precedence,
-                                        .builder = builder,
-                                    }, res1.rest),
-                                    .Error => |err| Result(InfixOperator).failure(err.msg, err.rest),
-                                };
-                            } else {
-                                return switch (try Parser.Char.string(stream, allocator, state, symbol)) {
-                                    .Result => |res2| Result(InfixOperator).success(InfixOperator{
-                                        .symbol = symbol,
-                                        .prec = precedence,
-                                        .builder = builder,
-                                    }, res2.rest),
-                                    .Error => |err| Result(InfixOperator).failure(err.msg, err.rest),
-                                };
-                            }
-                        },
-                        .Error => unreachable,
-                    }
-                }
-            }.inlineParser;
-        }
-
-        pub fn makePrefixOperator(
-            comptime symbol: []const u8,
-            comptime notFollowedBy: anytype,
-            comptime builder: PrefixOperatorBuilder,
-        ) PrefixOperatorParser {
-            return struct {
-                pub fn inlineParser(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState) anyerror!Result(PrefixOperator) {
-                    switch (try Parser.Char.spaces(stream, allocator, state)) {
-                        .Result => |res| {
-                            if (@TypeOf(notFollowedBy) != type) {
-                                return switch (try Parser.Combinator.notFollowedBy(
-                                    res.rest,
-                                    allocator,
-                                    state,
-                                    []const u8,
-                                    .{ .parser = Parser.Char.string, .args = .{symbol} },
-                                    u8,
-                                    notFollowedBy,
-                                )) {
-                                    .Result => |res1| Result(PrefixOperator).success(PrefixOperator{
-                                        .symbol = symbol,
-                                        .builder = builder,
-                                    }, res1.rest),
-                                    .Error => |err| Result(PrefixOperator).failure(err.msg, err.rest),
-                                };
-                            } else {
-                                return switch (try Parser.Char.string(stream, allocator, state, symbol)) {
-                                    .Result => |res2| Result(PrefixOperator).success(PrefixOperator{
-                                        .symbol = symbol,
-                                        .builder = builder,
-                                    }, res2.rest),
-                                    .Error => |err| Result(PrefixOperator).failure(err.msg, err.rest),
-                                };
-                            }
-                        },
-                        .Error => unreachable,
-                    }
-                }
-            }.inlineParser;
-        }
 
         fn pratt(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, termP: anytype, precLimit: u32) anyerror!Result(ExprType) {
             switch (try prattTerm(stream, allocator, state, termP)) {
