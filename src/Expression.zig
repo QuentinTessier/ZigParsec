@@ -46,12 +46,14 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
         pub const Operators = struct {
             infixOp: []InfixOperatorParser,
             prefixOp: []PrefixOperatorParser,
+            postfixOp: []PostfixOperatorParser,
 
-            pub fn createStateExtension(allocator: std.mem.Allocator, infixOp: []const InfixOperatorParser, prefixOp: []const PrefixOperatorParser) !*Operators {
+            pub fn createStateExtension(allocator: std.mem.Allocator, infixOp: []const InfixOperatorParser, prefixOp: []const PrefixOperatorParser, postfixOp: []const PostfixOperatorParser) !*Operators {
                 const op = try allocator.create(Operators);
                 op.* = .{
                     .infixOp = try allocator.dupe(InfixOperatorParser, infixOp),
                     .prefixOp = try allocator.dupe(PrefixOperatorParser, prefixOp),
+                    .postfixOp = try allocator.dupe(PrefixOperatorParser, postfixOp),
                 };
                 return op;
             }
@@ -60,6 +62,7 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
                 const ptr = state.getExtension(Operators).?;
                 allocator.free(ptr.infixOp);
                 allocator.free(ptr.prefixOp);
+                allocator.free(ptr.postfixOp);
                 allocator.destroy(ptr);
             }
         };
@@ -119,6 +122,38 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
             }
         };
 
+        pub const PostfixOperatorParser = PrefixOperatorParser;
+        pub const PostfixOperatorBuilder = PrefixOperatorBuilder;
+        pub const PostfixOperator = struct {
+            symbol: []const u8,
+            builder: PostfixOperatorBuilder,
+
+            pub fn id() PostfixOperator {
+                return .{
+                    .symbol = "id_postfix",
+                    .builder = struct {
+                        pub fn id_fnc(_: std.mem.Allocator, expr: ExprType) anyerror!ExprType {
+                            return expr;
+                        }
+                    }.id_fnc,
+                };
+            }
+
+            pub fn new(comptime parser: anytype, comptime builder: PostfixOperatorBuilder) PostfixOperatorParser {
+                return struct {
+                    pub fn inlineParser(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState) anyerror!Result(PrefixOperator) {
+                        return switch (try runParser(stream, allocator, state, []const u8, parser)) {
+                            .Result => |res| Result(PrefixOperator).success(PrefixOperator{
+                                .symbol = res.value,
+                                .builder = builder,
+                            }, res.rest),
+                            .Error => |err| Result(PrefixOperator).failure(err.msg, err.rest),
+                        };
+                    }
+                }.inlineParser;
+            }
+        };
+
         fn pratt(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, termP: anytype, precLimit: u32) anyerror!Result(ExprType) {
             switch (try prattTerm(stream, allocator, state, termP)) {
                 .Result => |res| {
@@ -156,12 +191,32 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
             return Result(PrefixOperator).success(PrefixOperator.id(), stream);
         }
 
+        fn prattPostfixOp(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState) anyerror!Result(PostfixOperator) {
+            const operators = state.getExtension(Operators) orelse unreachable;
+            const postfixOperator = operators.postfixOp;
+
+            for (postfixOperator) |parser| {
+                switch (try parser(stream, allocator, state)) {
+                    .Result => |res| return Result(PostfixOperator).success(res.value, res.rest),
+                    .Error => |err| err.msg.deinit(),
+                }
+            }
+            return Result(PostfixOperator).success(PostfixOperator.id(), stream);
+        }
+
         fn prattTerm(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, termP: anytype) anyerror!Result(ExprType) {
             switch (try prattPrefixOp(stream, allocator, state)) {
                 .Result => |res| {
+                    const preFn = res.value.builder;
                     switch (try runParser(res.rest, allocator, state, ExprType, termP)) {
                         .Result => |res1| {
-                            return Result(ExprType).success(try res.value.builder(allocator, res1.value), res1.rest);
+                            switch (try prattPostfixOp(stream, allocator, state)) {
+                                .Result => |res2| {
+                                    const postFn = res2.value.builder;
+                                    return Result(ExprType).success(try postFn(allocator, try preFn(allocator, res1.value)), res1.rest);
+                                },
+                                .Error => unreachable,
+                            }
                         },
                         .Error => |err| return Result(ExprType).failure(err.msg, err.rest),
                     }
