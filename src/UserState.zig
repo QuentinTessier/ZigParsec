@@ -4,7 +4,7 @@ pub const ZigParsecState = struct {
     extensions: ?*anyopaque = null, // Can store things like SlitOperators for Expression Parser
 
     pub fn getParent(self: *ZigParsecState, comptime T: type) *T {
-        return @fieldParentPtr(T, "baseState", self);
+        return @fieldParentPtr("baseState", self);
     }
 
     pub fn getExtension(self: *ZigParsecState, comptime Ext: type) ?*Ext {

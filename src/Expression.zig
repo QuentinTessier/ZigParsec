@@ -53,7 +53,7 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
                 op.* = .{
                     .infixOp = try allocator.dupe(InfixOperatorParser, infixOp),
                     .prefixOp = try allocator.dupe(PrefixOperatorParser, prefixOp),
-                    .postfixOp = try allocator.dupe(PrefixOperatorParser, postfixOp),
+                    .postfixOp = try allocator.dupe(PostfixOperatorParser, postfixOp),
                 };
                 return op;
             }
@@ -66,9 +66,9 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
                 allocator.destroy(ptr);
             }
         };
+
         pub const InfixOperatorParser = *const fn (Stream, std.mem.Allocator, *ZigParsecState) anyerror!Result(InfixOperator);
         pub const InfixOperatorBuilder = *const fn (std.mem.Allocator, ExprType, ExprType) anyerror!ExprType;
-
         pub const InfixOperator = struct {
             symbol: []const u8,
             prec: OperatorPrecedence,
@@ -122,8 +122,8 @@ pub fn BuildExpressionParser(comptime ExprType: type) type {
             }
         };
 
-        pub const PostfixOperatorParser = PrefixOperatorParser;
-        pub const PostfixOperatorBuilder = PrefixOperatorBuilder;
+        pub const PostfixOperatorParser = *const fn (Stream, std.mem.Allocator, *ZigParsecState) anyerror!Result(PostfixOperator);
+        pub const PostfixOperatorBuilder = *const fn (std.mem.Allocator, ExprType) anyerror!ExprType;
         pub const PostfixOperator = struct {
             symbol: []const u8,
             builder: PostfixOperatorBuilder,
