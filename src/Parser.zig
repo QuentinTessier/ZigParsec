@@ -64,3 +64,63 @@ pub inline fn map(stream: Stream, allocator: std.mem.Allocator, state: *ZigParse
         .Error => |err| Result(To).failure(err.msg, err.rest),
     };
 }
+
+pub fn toStruct(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime S: type, comptime mapped_parsers: anytype) anyerror!Result(S) {
+    if (@typeInfo(S) != .Struct or @typeInfo(S).Struct.is_tuple == true) {
+        @compileError("toStruct expectes a struct type has arguments, got another type or a tuple");
+    }
+
+    var s: S = undefined;
+    var str = stream;
+    inline for (mapped_parsers) |field_parser_tuple| {
+        const maybe_field = field_parser_tuple[0];
+        const t = field_parser_tuple[1];
+        const parser = field_parser_tuple[2];
+
+        if (@TypeOf(maybe_field) == type and maybe_field == void) {
+            switch (try runParser(str, allocator, state, t, parser)) {
+                .Result => |res| {
+                    str = res.rest;
+                },
+                .Error => |err| return Result(S).failure(err.msg, err.rest),
+            }
+        } else {
+            const field = maybe_field;
+            switch (try runParser(str, allocator, state, t, parser)) {
+                .Result => |res| {
+                    @field(s, std.meta.fieldInfo(S, field).name) = res.value;
+                    str = res.rest;
+                },
+                .Error => |err| return Result(S).failure(err.msg, err.rest),
+            }
+        }
+    }
+    return Result(S).success(s, str);
+}
+
+pub fn toTaggedUnion(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime U: type, comptime mapped_parsers: anytype) anyerror!Result(U) {
+    if (@typeInfo(U) != .Union) {
+        @panic("");
+    }
+
+    var error_msg = std.ArrayList(u8).init(allocator);
+    var writer = error_msg.writer();
+    try writer.print("{}: Choice Parser:\n", .{stream});
+    inline for (mapped_parsers) |field_parser_tuple| {
+        const field = field_parser_tuple[0];
+        const t = field_parser_tuple[1];
+        const parser = field_parser_tuple[2];
+
+        switch (try runParser(stream, allocator, state, t, parser)) {
+            .Result => |res| {
+                error_msg.deinit();
+                return Result(U).success(@unionInit(U, std.meta.fieldInfo(U, field).name, res.value), res.rest);
+            },
+            .Error => |err| {
+                try writer.print("\t{s}\n", .{err.msg.items});
+                err.msg.deinit();
+            },
+        }
+    }
+    return Result(U).failure(error_msg, stream);
+}

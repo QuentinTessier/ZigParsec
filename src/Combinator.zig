@@ -115,10 +115,10 @@ pub fn option(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecSta
     return switch (r) {
         .Result => r,
         .Error => |err| blk: {
-            if (stream.diff(err.rest).len == 0)
-                break :blk Result(Value).success(x, err.rest)
-            else
-                break :blk r;
+            if (stream.diff(err.rest).len == 0) {
+                err.msg.deinit();
+                break :blk Result(Value).success(x, err.rest);
+            } else break :blk r;
         },
     };
 }
@@ -126,12 +126,12 @@ pub fn option(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecSta
 pub fn optionMaybe(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecState, comptime Value: type, parser: anytype) anyerror!Result(?Value) {
     const r = try runParser(stream, allocator, state, Value, parser);
     return switch (r) {
-        .Result => r,
+        .Result => |res| Result(?Value).success(res.value, res.rest),
         .Error => |err| blk: {
-            if (stream.diff(err.rest).len == 0)
-                break :blk Result(Value).success(null, err.rest)
-            else
-                break :blk r;
+            if (stream.diff(err.rest).len == 0) {
+                err.msg.deinit();
+                break :blk Result(?Value).success(null, err.rest);
+            } else break :blk Result(?Value).convertError(r);
         },
     };
 }
@@ -141,10 +141,10 @@ pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: *ZigParsecS
     return switch (r) {
         .Result => |res| Result(void).success(void{}, res.rest),
         .Error => |err| blk: {
-            if (stream.diff(err.rest).len == 0)
-                break :blk Result(Value).success(void{}, err.rest)
-            else
-                break :blk r;
+            if (stream.diff(err.rest).len == 0) {
+                err.msg.deinit();
+                break :blk Result(void).success(void{}, err.rest);
+            } else break :blk Result(void).convertError(r);
         },
     };
 }

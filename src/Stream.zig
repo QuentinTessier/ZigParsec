@@ -30,7 +30,7 @@ pub fn remaining(self: Stream) usize {
 }
 
 pub fn diff(self: Stream, tail: Stream) []const u8 {
-    std.debug.assert(self.currentLocation.index < tail.currentLocation.index);
+    //std.debug.assert(self.currentLocation.index >= tail.currentLocation.index);
     return self.data[self.currentLocation.index..tail.currentLocation.index];
 }
 
