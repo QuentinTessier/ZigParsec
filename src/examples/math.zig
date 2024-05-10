@@ -2,14 +2,14 @@ const std = @import("std");
 
 const Parser = @import("../Parser.zig");
 
-pub fn singleDigitNumger(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(i32) {
+pub fn singleDigitNumger(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(i32) {
     return switch (try Parser.Char.digit(stream, allocator, state)) {
         .Result => |res| Parser.Result(i32).success(@intCast(res.value - 48), res.rest),
         .Error => |err| Parser.Result(i32).failure(err.msg, err.rest),
     };
 }
 
-pub fn subExpr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(i32) {
+pub fn subExpr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(i32) {
     return Parser.Combinator.between(
         stream,
         allocator,
@@ -21,7 +21,7 @@ pub fn subExpr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Pars
     );
 }
 
-pub fn expr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(i32) {
+pub fn expr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(i32) {
     return Parser.Combinator.chainl1(
         stream,
         allocator,
@@ -33,7 +33,7 @@ pub fn expr(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.
     );
 }
 
-pub fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(i32) {
+pub fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(i32) {
     return Parser.Combinator.chainl1(
         stream,
         allocator,
@@ -45,7 +45,7 @@ pub fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.
     );
 }
 
-pub fn factor(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(i32) {
+pub fn factor(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(i32) {
     return Parser.Combinator.choice(stream, allocator, state, i32, &.{
         subExpr,
         singleDigitNumger,
@@ -68,7 +68,7 @@ pub fn div(_: std.mem.Allocator, lhs: i32, rhs: i32) anyerror!i32 {
     return @divFloor(lhs, rhs);
 }
 
-pub fn mulOp(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(*const fn (std.mem.Allocator, i32, i32) anyerror!i32) {
+pub fn mulOp(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*const fn (std.mem.Allocator, i32, i32) anyerror!i32) {
     switch (try Parser.Combinator.choice(stream, allocator, state, u8, &.{
         .{ .parser = Parser.Char.symbol, .args = .{'*'} },
         .{ .parser = Parser.Char.symbol, .args = .{'/'} },
@@ -84,7 +84,7 @@ pub fn mulOp(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser
     }
 }
 
-pub fn addOp(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(*const fn (std.mem.Allocator, i32, i32) anyerror!i32) {
+pub fn addOp(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*const fn (std.mem.Allocator, i32, i32) anyerror!i32) {
     switch (try Parser.Combinator.choice(stream, allocator, state, u8, &.{
         .{ .parser = Parser.Char.symbol, .args = .{'+'} },
         .{ .parser = Parser.Char.symbol, .args = .{'-'} },

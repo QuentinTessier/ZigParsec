@@ -1,10 +1,10 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
-const ZigParsecState = @import("UserState.zig").ZigParsecState;
+const BaseState = @import("UserState.zig").BaseState;
 
 const Result = @import("Result.zig").Result;
 
-pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, c: u8) anyerror!Result(u8) {
+pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, c: u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -23,7 +23,7 @@ pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, 
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, x: []const u8) anyerror!Result(u8) {
+pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -44,7 +44,7 @@ pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, x
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, x: []const u8) anyerror!Result(u8) {
+pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -65,7 +65,7 @@ pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, 
     return Result(u8).success(peeked[0], stream.eat(1));
 }
 
-pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, l: u8, h: u8) anyerror!Result(u8) {
+pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, l: u8, h: u8) anyerror!Result(u8) {
     std.debug.assert(l < h);
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -84,7 +84,7 @@ pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, l
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -103,7 +103,7 @@ pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -122,7 +122,7 @@ pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -141,7 +141,7 @@ pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -160,7 +160,7 @@ pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -179,7 +179,7 @@ pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -203,7 +203,7 @@ pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -222,7 +222,7 @@ pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, fnc: *const fn (u8) bool) anyerror!Result(u8) {
+pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, fnc: *const fn (u8) bool) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -241,7 +241,7 @@ pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState,
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(u8) {
+pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -260,7 +260,7 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState) a
     return Result(u8).failure(error_msg, stream);
 }
 
-pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState) anyerror!Result(void) {
+pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Result(void) {
     if (stream.isEOF()) return Result(void).success(void{}, stream);
     const start = stream.currentLocation.index;
     var end = start;
@@ -270,7 +270,7 @@ pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *ZigParsecState) anyerror
     return Result(void).success(void{}, stream.eat(end - start));
 }
 
-pub fn string(stream: Stream, allocator: std.mem.Allocator, _: *ZigParsecState, str: []const u8) anyerror!Result([]const u8) {
+pub fn string(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, str: []const u8) anyerror!Result([]const u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();

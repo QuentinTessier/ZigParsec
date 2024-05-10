@@ -1,13 +1,13 @@
 const std = @import("std");
 
-pub const ZigParsecState = struct {
+pub const BaseState = struct {
     extensions: ?*anyopaque = null, // Can store things like SlitOperators for Expression Parser
 
-    pub fn getParent(self: *ZigParsecState, comptime T: type) *T {
+    pub fn getParent(self: *BaseState, comptime T: type) *T {
         return @fieldParentPtr("baseState", self);
     }
 
-    pub fn getExtension(self: *ZigParsecState, comptime Ext: type) ?*Ext {
+    pub fn getExtension(self: *BaseState, comptime Ext: type) ?*Ext {
         return if (self.extensions) |ptr| @as(*Ext, @ptrCast(@alignCast(ptr))) else null;
     }
 };
@@ -19,10 +19,10 @@ pub fn MakeUserStateType(comptime S: type) type {
             var fields: []const std.builtin.Type.StructField = &[0]std.builtin.Type.StructField{};
             fields = fields ++ [_]std.builtin.Type.StructField{.{
                 .name = "baseState",
-                .type = ZigParsecState,
+                .type = BaseState,
                 .default_value = null,
                 .is_comptime = false,
-                .alignment = @alignOf(ZigParsecState),
+                .alignment = @alignOf(BaseState),
             }};
             for (s.fields) |x| {
                 fields = fields ++ [_]std.builtin.Type.StructField{x};
@@ -34,15 +34,15 @@ pub fn MakeUserStateType(comptime S: type) type {
                 .decls = &[_]std.builtin.Type.Declaration{},
             } });
         },
-        .Void => return ZigParsecState,
+        .Void => return BaseState,
         else => {
             var fields: []const std.builtin.Type.StructField = &[0]std.builtin.Type.StructField{};
             fields = fields ++ [_]std.builtin.Type.StructField{.{
                 .name = "baseState",
-                .type = ZigParsecState,
+                .type = BaseState,
                 .default_value = null,
                 .is_comptime = false,
-                .alignment = @alignOf(ZigParsecState),
+                .alignment = @alignOf(BaseState),
             }};
             fields = fields ++ [_]std.builtin.Type.StructField{.{
                 .name = "userState",

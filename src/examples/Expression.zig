@@ -83,7 +83,7 @@ fn mapFn(allocator: std.mem.Allocator, digits: []u8) anyerror!*Expr {
     return l;
 }
 
-fn literal(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(*Expr) {
+fn literal(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
     return Parser.Language.eatWhitespaceBefore(
         stream,
         allocator,
@@ -94,7 +94,7 @@ fn literal(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.Z
 }
 
 // Recursive definition to handle => '(' <expression> ')'
-fn subexpression(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(*Expr) {
+fn subexpression(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
     return Parser.Combinator.between(
         stream,
         allocator,
@@ -106,17 +106,17 @@ fn subexpression(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Pa
     );
 }
 
-fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.ZigParsecState) anyerror!Parser.Result(*Expr) {
+fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
     return Parser.Combinator.choice(stream, allocator, state, *Expr, .{
         subexpression,
         literal,
     });
 }
 
-pub fn makeStateExtension(allocator: std.mem.Allocator, state: *Parser.ZigParsecState) !void {
+pub fn makeStateExtension(allocator: std.mem.Allocator, state: *Parser.BaseState) !void {
     state.extensions = try Expression.Operators.createStateExtension(allocator, &InfixOperators, &.{});
 }
 
-pub fn destroyStateExtension(allocator: std.mem.Allocator, state: *Parser.ZigParsecState) void {
+pub fn destroyStateExtension(allocator: std.mem.Allocator, state: *Parser.BaseState) void {
     Expression.Operators.destroyStateExtension(allocator, state);
 }
