@@ -1,7 +1,7 @@
 # Zig Parsec
 
 During my exploration of functionnal programming, I encountered the notion of Parser Combinator when working on a small compiler for LLVM's Kaleidoscope example.
-Later on I saw a few articles and repository for Parser Combinator in Zig ([mecha]([mecha](https://github.com/Hejsil/mecha)), [hexop's blog](https://devlog.hexops.com/2021/zig-parser-combinators-and-why-theyre-awesome/))
+Later on I saw a few articles and repository for Parser Combinator in Zig ([mecha](https://github.com/Hejsil/mecha), [hexop's blog](https://devlog.hexops.com/2021/zig-parser-combinators-and-why-theyre-awesome/))
 
 This is my approach to implement the concept following closely what can be found in the Parsec library for the Haskell language.
 
@@ -24,5 +24,6 @@ fn letterA(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Result(
 ```
 
 [Stream](/src/Stream.zig) is a simple object that represent a string with some information on the position of the cursor.
+
 [BaseState](/src/UserState.zig) is a object used to define user state variable and state extension (for specialized parser).
 
