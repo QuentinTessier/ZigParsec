@@ -74,3 +74,140 @@ pub inline fn eatWhitespaceBefore(stream: Stream, allocator: std.mem.Allocator, 
         .Error => |err| Result(T).failure(err.msg, err.rest),
     };
 }
+
+pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+    switch (try Parser.Char.digit(stream, allocator, state)) {
+        .Result => |res| {
+            var s = res.rest;
+            while (blk: {
+                switch (try Parser.Char.digit(s, allocator, state)) {
+                    .Result => |res1| {
+                        s = res1.rest;
+                        break :blk true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :blk false;
+                    },
+                }
+            }) {}
+            const buffer = stream.diff(s);
+            return Result(Int).success(try std.fmt.parseInt(Int, buffer, 10), s);
+        },
+        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+    }
+}
+
+pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+    switch (try Parser.Char.hexDigit(stream, allocator, state)) {
+        .Result => |res| {
+            var s = res.rest;
+            while (blk: {
+                switch (try Parser.Char.hexDigit(s, allocator, state)) {
+                    .Result => |res1| {
+                        s = res1.rest;
+                        break :blk true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :blk false;
+                    },
+                }
+            }) {}
+            const buffer = stream.diff(s);
+            return Result(Int).success(try std.fmt.parseInt(Int, buffer, 16), s);
+        },
+        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+    }
+}
+
+pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+    switch (try Parser.Char.octDigit(stream, allocator, state)) {
+        .Result => |res| {
+            var s = res.rest;
+            while (blk: {
+                switch (try Parser.Char.octDigit(s, allocator, state)) {
+                    .Result => |res1| {
+                        s = res1.rest;
+                        break :blk true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :blk false;
+                    },
+                }
+            }) {}
+            const buffer = stream.diff(s);
+            return Result(Int).success(try std.fmt.parseInt(Int, buffer, 8), s);
+        },
+        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+    }
+}
+
+inline fn floating1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+    switch (try Parser.Char.digit(stream, allocator, state)) {
+        .Result => |res| {
+            var s = res.rest;
+            while (blk: {
+                switch (try Parser.Char.digit(s, allocator, state)) {
+                    .Result => |res1| {
+                        s = res1.rest;
+                        break :blk true;
+                    },
+                    .Error => |err| {
+                        err.msg.deinit();
+                        break :blk false;
+                    },
+                }
+            }) {}
+            return Result(void).success(void{}, s);
+        },
+        .Error => |err| return Result(void).failure(err.msg, err.rest),
+    }
+}
+
+inline fn floating2(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+    return switch (try Parser.Char.symbol(stream, allocator, state, '.')) {
+        .Result => |res| floating1(res.rest, allocator, state),
+        .Error => |err| blk: {
+            err.msg.deinit();
+            break :blk Result(void).success(void{}, stream);
+        },
+    };
+}
+
+inline fn floating3(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+    return switch (try Parser.Char.symbol(stream, allocator, state, 'e')) {
+        .Result => |res| switch (try Parser.Char.symbol(res.rest, allocator, state, '-')) {
+            .Result => |res1| floating1(res1.rest, allocator, state),
+            .Error => |err| blk: {
+                err.msg.deinit();
+                break :blk floating1(err.rest, allocator, state);
+            },
+        },
+        .Error => |err| blk: {
+            err.msg.deinit();
+            break :blk Result(void).success(void{}, stream);
+        },
+    };
+}
+
+pub fn floating(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Float: type) anyerror!Result(Float) {
+    switch (try floating1(stream, allocator, state)) {
+        .Result => |res| {
+            var s = res.rest;
+            switch (try floating2(s, allocator, state)) {
+                .Result => |res1| s = res1.rest,
+                .Error => unreachable,
+            }
+            switch (try floating3(s, allocator, state)) {
+                .Result => |res2| s = res2.rest,
+                .Error => unreachable,
+            }
+
+            const buffer = stream.diff(s);
+            return Result(Float).success(try std.fmt.parseFloat(Float, buffer), s);
+        },
+        .Error => |err| return Result(Float).failure(err.msg, err.rest),
+    }
+}
