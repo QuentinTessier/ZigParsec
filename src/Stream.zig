@@ -15,7 +15,6 @@ pub const Location = struct {
 data: []const u8,
 label: ?[]const u8,
 currentLocation: Location,
-eatWhitespace: bool = true,
 
 pub fn init(bytes: []const u8, label: ?[]const u8) Stream {
     return .{
