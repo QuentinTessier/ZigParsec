@@ -5,17 +5,24 @@ const BaseState = @import("UserState.zig").BaseState;
 const Result = @import("Result.zig").Result;
 const runParser = Parser.runParser;
 
+fn identifierChar(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime isFirstChar: bool) anyerror!Result(u8) {
+    return Parser.Combinator.choice(stream, allocator, state, u8, if (isFirstChar) .{
+        Parser.Char.alpha,
+        .{ Parser.Char.symbol, .{'_'} },
+    } else .{
+        Parser.Char.alphaNum,
+        .{ Parser.Char.symbol, .{'_'} },
+    });
+}
+
 pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result([]u8) {
     var array: std.ArrayList(u8) = std.ArrayList(u8).init(allocator);
     var s = stream;
     s.eatWhitespace = false;
-    switch (try Parser.Combinator.choice(s, allocator, state, u8, &.{
-        Parser.Char.alpha,
-        .{ .parser = Parser.Char.symbol, .args = .{'_'} },
-    })) {
+    switch (try identifierChar(stream, allocator, state, true)) {
         .Result => |res| {
             try array.append(res.value);
-            switch (try Parser.Combinator.many(res.rest, allocator, state, u8, Parser.Char.alphaNum)) {
+            switch (try Parser.Combinator.many(res.rest, allocator, state, u8, .{ identifierChar, .{false} })) {
                 .Result => |res2| {
                     if (res2.value.len > 0) {
                         try array.appendSlice(res2.value);
