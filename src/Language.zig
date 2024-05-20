@@ -37,10 +37,6 @@ pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: *BaseStat
     }
 }
 
-pub fn integerString(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result([]u8) {
-    return Parser.Combinator.many1(stream, allocator, state, u8, Parser.Char.digit);
-}
-
 pub fn reserved(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, name: []const u8) anyerror!Result([]const u8) {
     return Parser.Combinator.notFollowedBy(stream, allocator, state, []const u8, .{ .parser = Parser.Char.string, .args = .{name} }, u8, Parser.Char.alphaNum);
 }

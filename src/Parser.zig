@@ -5,11 +5,7 @@ pub const MakeUserStateType = @import("UserState.zig").MakeUserStateType;
 pub const Result = @import("Result.zig").Result;
 pub const ParseError = @import("Result.zig").ParseError;
 
-// TODO: Basic Language parser (integer, float, keyword, identifier, ...)
 // TODO: Tests
-// TODO: Change the way we can eat whitespace.
-// ----- Stream.eatWhitespace isn't the way, works for simple parser, but becomes anoying when trying to do more complicated things
-// ----- See Combinator.skipMany => create Char.skipeManySpaces ...
 pub const Stream = @import("Stream.zig");
 pub const Char = @import("Char.zig");
 pub const Combinator = @import("Combinator.zig");
