@@ -4,6 +4,7 @@ const BaseState = @import("UserState.zig").BaseState;
 
 const Result = @import("Result.zig").Result;
 
+// Tries to match 'c'
 pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, c: u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -23,6 +24,19 @@ pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, c: u8
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match any character
+pub fn any(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+    if (stream.isEOF()) {
+        var error_msg = std.ArrayList(u8).init(allocator);
+        var writer = error_msg.writer();
+        try writer.print("{}: Unexpected EndOfStream", .{stream});
+        return Result(u8).failure(error_msg, stream);
+    }
+
+    return Result(u8).success(stream.peek(1)[0], stream.eat(1));
+}
+
+// Match one of the character given in the array
 pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -44,6 +58,7 @@ pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []c
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match none of the character given in the array
 pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -65,6 +80,7 @@ pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []
     return Result(u8).success(peeked[0], stream.eat(1));
 }
 
+// Match a character between l and h
 pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, l: u8, h: u8) anyerror!Result(u8) {
     std.debug.assert(l < h);
     if (stream.isEOF()) {
@@ -84,6 +100,7 @@ pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, l: u8,
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a uppercase letter
 pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -103,6 +120,7 @@ pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a lowercase letter
 pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -122,6 +140,7 @@ pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a upper or lowercase letter
 pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -141,6 +160,7 @@ pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a upper or lowercase letter or a digit
 pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -160,6 +180,7 @@ pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a digit
 pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -179,6 +200,7 @@ pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a octal digit
 pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -203,6 +225,7 @@ pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a hexadecimal digit
 pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -222,6 +245,7 @@ pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a character statisfying the given function
 pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, fnc: *const fn (u8) bool) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -241,6 +265,7 @@ pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, fnc:
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match a whitespace
 pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -260,6 +285,7 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
     return Result(u8).failure(error_msg, stream);
 }
 
+// Match multiple whitespaces
 pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Result(void) {
     if (stream.isEOF()) return Result(void).success(void{}, stream);
     const start = stream.currentLocation.index;
@@ -270,6 +296,7 @@ pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Resu
     return Result(void).success(void{}, stream.eat(end - start));
 }
 
+// Match a given string
 pub fn string(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, str: []const u8) anyerror!Result([]const u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);

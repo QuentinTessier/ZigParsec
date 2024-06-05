@@ -12,6 +12,7 @@ pub const BaseState = struct {
     }
 };
 
+// Given a type S generates a new type to fit the BaseState.getParent()
 pub fn MakeUserStateType(comptime S: type) type {
     const info = @typeInfo(S);
     switch (info) {
