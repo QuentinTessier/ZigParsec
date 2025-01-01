@@ -5,8 +5,6 @@ pub const MakeUserStateType = @import("UserState.zig").MakeUserStateType;
 pub const Result = @import("Result.zig").Result;
 pub const ParseError = @import("Result.zig").ParseError;
 
-pub const CSV = @import("CSV.zig").CSVParser;
-
 // TODO: Tests
 // TODO: Better ParserError type
 // TODO: Rework examples
