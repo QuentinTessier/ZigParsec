@@ -1,122 +1,89 @@
 const std = @import("std");
 const Parser = @import("../Parser.zig");
-const Expression = Parser.Expression(*Expr);
 
-pub const AST = enum {
-    Lit,
-    UnOp,
-    BinOp,
+const Expr = Parser.Expr.ExpressionParserGenerator(*Expression);
+
+const BinOpType = enum {
+    Add,
+    Sub,
+    Mul,
+    Div,
 };
 
-pub const UnaryOperator = struct {
-    pub const Kind = enum {
-        Negate,
-    };
-
-    kind: Kind,
-    rhs: *Expr,
-
-    pub fn Generator(comptime k: Kind) fn (std.mem.Allocator, *Expr) anyerror!*Expr {
-        return struct {
-            pub fn gen(allocator: std.mem.Allocator, rhs: *Expr) anyerror!*Expr {
-                const o = try allocator.create(Expr);
-                o.* = .{ .UnOp = .{
-                    .kind = k,
-                    .rhs = rhs,
-                } };
-                return o;
-            }
-        }.gen;
-    }
+const BinOp = struct {
+    t: BinOpType,
+    lhs: *Expression,
+    rhs: *Expression,
 };
 
-pub const BinaryOperator = struct {
-    pub const Kind = enum {
-        Add,
-        Sub,
-        Mul,
-        Div,
-    };
-
-    kind: Kind,
-    lhs: *Expr,
-    rhs: *Expr,
-
-    pub fn Generator(comptime k: Kind) fn (std.mem.Allocator, *Expr, *Expr) anyerror!*Expr {
-        return struct {
-            pub fn gen(allocator: std.mem.Allocator, lhs: *Expr, rhs: *Expr) anyerror!*Expr {
-                const o = try allocator.create(Expr);
-                o.* = .{ .BinOp = .{
-                    .kind = k,
-                    .lhs = lhs,
-                    .rhs = rhs,
-                } };
-                return o;
-            }
-        }.gen;
-    }
+const UnOpType = enum {
+    Neg,
 };
 
-pub const Expr = union(AST) {
-    Lit: i64,
-    UnOp: UnaryOperator,
-    BinOp: BinaryOperator,
+const UnOp = struct {
+    t: UnOpType,
+    rhs: *Expression,
 };
 
-pub const InfixOperators = [_]Expression.InfixOperatorParser{
-    Expression.InfixOperator.new(.{ Parser.Language.operator, .{ "+", "+=" } }, .{ .LeftAssoc = 1 }, BinaryOperator.Generator(.Add)),
-    Expression.InfixOperator.new(.{ Parser.Language.operator, .{ "-", "-=" } }, .{ .LeftAssoc = 1 }, BinaryOperator.Generator(.Sub)),
-    Expression.InfixOperator.new(.{ Parser.Language.operator, .{ "*", null } }, .{ .LeftAssoc = 1 }, BinaryOperator.Generator(.Mul)),
-    Expression.InfixOperator.new(.{ Parser.Language.operator, .{ "/", "/" } }, .{ .LeftAssoc = 1 }, BinaryOperator.Generator(.Div)),
+const Expression = union(enum) {
+    Literal: u8, // Single digit
+    BinaryOp: BinOp,
+    UnaryOp: UnOp,
 };
 
-pub const PrefixOperators = [_]Expression.PrefixOperatorParser{
-    Expression.PrefixOperator.new(.{ Parser.Language.operator, .{ "-", "-=" }, UnaryOperator.Generator(.Negate) }),
-};
+pub fn MakeBinaryOperatorBuilder(comptime op: BinOpType) fn (std.mem.Allocator, *Expression, *Expression) anyerror!*Expression {
+    return struct {
+        pub fn inlineBuilder(allocator: std.mem.Allocator, lhs: *Expression, rhs: *Expression) anyerror!*Expression {
+            const n = try allocator.create(Expression);
+            n.* = .{ .BinaryOp = .{
+                .t = op,
+                .lhs = lhs,
+                .rhs = rhs,
+            } };
 
-fn mapFn(allocator: std.mem.Allocator, digits: []u8) anyerror!*Expr {
-    const l = try allocator.create(*Expr);
-    l.* = .{
-        .Lit = try std.fmt.parseInt(i64, digits, 10),
-    };
-    allocator.free(digits);
-    return l;
+            return n;
+        }
+    }.inlineBuilder;
 }
 
-fn literal(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
-    return Parser.Language.eatWhitespaceBefore(
-        stream,
-        allocator,
-        state,
-        *Expr,
-        .{ Parser.map, .{ []u8, Parser.Language.integerString, *Expr, mapFn } },
-    );
+pub fn MakeUnaryOperatorBuilder(comptime op: UnOpType) fn (std.mem.Allocator, *Expression, *Expression) anyerror!*Expression {
+    return struct {
+        pub fn inlineBuilder(allocator: std.mem.Allocator, rhs: *Expression) anyerror!*Expression {
+            const n = try allocator.create(Expression);
+            n.* = .{ .UnaryOp = .{
+                .t = op,
+                .rhs = rhs,
+            } };
+
+            return n;
+        }
+    }.inlineBuilder;
 }
 
-// Recursive definition to handle => '(' <expression> ')'
-fn subexpression(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
-    return Parser.Combinator.between(
-        stream,
-        allocator,
-        state,
-        .{ u8, *Expr, u8 },
-        .{ Parser.Char.symbol, .{'('} },
-        .{ Expression.expression, .{term} },
-        .{ Parser.Char.symbol, .{')'} },
-    );
+pub fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: Parser.State) anyerror!Parser.Result(*Expression) {
+    return Parser.map(stream, allocator, state, u8, Parser.Char.digit, *Expression, struct {
+        pub fn inlineMap(a: std.mem.Allocator, digit: u8) anyerror!*Expression {
+            const n = try a.create(Expression);
+            n.* = .{
+                .Literal = digit,
+            };
+            return n;
+        }
+    }.inlineMap);
 }
 
-fn term(stream: Parser.Stream, allocator: std.mem.Allocator, state: *Parser.BaseState) anyerror!Parser.Result(*Expr) {
-    return Parser.Combinator.choice(stream, allocator, state, *Expr, .{
-        subexpression,
-        literal,
-    });
-}
+const ExprP = Parser.Expr.ExpressionParserGenerator(*Expression);
 
-pub fn makeStateExtension(allocator: std.mem.Allocator, state: *Parser.BaseState) !void {
-    state.extensions = try Expression.Operators.createStateExtension(allocator, &InfixOperators, &.{});
-}
-
-pub fn destroyStateExtension(allocator: std.mem.Allocator, state: *Parser.BaseState) void {
-    Expression.Operators.destroyStateExtension(allocator, state);
-}
+// You can directly call this function, it follows the standard way to define a Parser.
+pub const expression = ExprP.buildExpressionParser(.{
+    .infix = &.{
+        ExprP.InfixOperator.new(.{ Parser.Language.operator, .{ "+", "+" } }, .{ .LeftAssoc = 60 }, MakeBinaryOperatorBuilder(.Add)),
+        ExprP.InfixOperator.new(.{ Parser.Language.operator, .{ "-", "-" } }, .{ .LeftAssoc = 60 }, MakeBinaryOperatorBuilder(.Sub)),
+        ExprP.InfixOperator.new(.{ Parser.Language.operator, .{ "*", "*" } }, .{ .LeftAssoc = 70 }, MakeBinaryOperatorBuilder(.Mul)),
+        ExprP.InfixOperator.new(.{ Parser.Language.operator, .{ "/", "/" } }, .{ .LeftAssoc = 70 }, MakeBinaryOperatorBuilder(.Div)),
+    },
+    .prefix = &.{
+        Expr.PrefixOperator.new(.{ Parser.Language.operator, .{ "-", "=" } }, MakeUnaryOperatorBuilder(.Neg)),
+    },
+    .postfix = &.{},
+}, term);
