@@ -1,12 +1,12 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
 const Result = @import("Result.zig").Result;
-const BaseState = @import("UserState.zig").BaseState;
+const State = @import("UserState.zig").State;
 
 const runParser = @import("Parser.zig").runParser;
 
 // Apply parser p zero or more time
-pub fn many(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, p: anytype) anyerror!Result([]Value) {
+pub fn many(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, p: anytype) anyerror!Result([]Value) {
     var array = std.ArrayList(Value).init(allocator);
     var s = stream;
     while (true) {
@@ -26,7 +26,7 @@ pub fn many(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, com
 }
 
 // Apply parser p one or more time
-pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, p: anytype) anyerror!Result([]Value) {
+pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, p: anytype) anyerror!Result([]Value) {
     var array = std.ArrayList(Value).init(allocator);
     var s = stream;
     var r: Result(Value) = undefined;
@@ -59,7 +59,7 @@ pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, co
 }
 
 // Apply parser p zero or more time ignoring the return value
-pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, p: anytype) anyerror!Result(void) {
+pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, p: anytype) anyerror!Result(void) {
     var s = stream;
     while (true) {
         const r = try runParser(s, allocator, state, Value, p);
@@ -77,7 +77,7 @@ pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: *BaseState,
 }
 
 // Run the given parsers sequentialy and return the first successful parser
-pub fn choice(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, parsers: anytype) anyerror!Result(Value) {
+pub fn choice(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, parsers: anytype) anyerror!Result(Value) {
     var error_msg = std.ArrayList(u8).init(allocator);
     var writer = error_msg.writer();
     try writer.print("{}: Choice Parser:\n", .{stream});
@@ -97,7 +97,7 @@ pub fn choice(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, c
     return Result(Value).failure(error_msg, stream);
 }
 
-pub fn between(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Values: [3]type, start: anytype, parser: anytype, end: anytype) anyerror!Result(Values[1]) {
+pub fn between(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Values: [3]type, start: anytype, parser: anytype, end: anytype) anyerror!Result(Values[1]) {
     switch (try runParser(stream, allocator, state, Values[0], start)) {
         .Result => |res_start| {
             switch (try runParser(res_start.rest, allocator, state, Values[1], parser)) {
@@ -114,7 +114,7 @@ pub fn between(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, 
     }
 }
 
-pub fn option(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, x: Value, parser: anytype) anyerror!Result(Value) {
+pub fn option(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, x: Value, parser: anytype) anyerror!Result(Value) {
     const r = try runParser(stream, allocator, state, Value, parser);
     return switch (r) {
         .Result => r,
@@ -127,7 +127,7 @@ pub fn option(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, c
     };
 }
 
-pub fn optionMaybe(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, parser: anytype) anyerror!Result(?Value) {
+pub fn optionMaybe(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, parser: anytype) anyerror!Result(?Value) {
     const r = try runParser(stream, allocator, state, Value, parser);
     return switch (r) {
         .Result => |res| Result(?Value).success(res.value, res.rest),
@@ -140,7 +140,7 @@ pub fn optionMaybe(stream: Stream, allocator: std.mem.Allocator, state: *BaseSta
     };
 }
 
-pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Value: type, parser: anytype) anyerror!Result(void) {
+pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, parser: anytype) anyerror!Result(void) {
     const r = try runParser(stream, allocator, state, Value, parser);
     return switch (r) {
         .Result => |res| Result(void).success(void{}, res.rest),
@@ -153,7 +153,7 @@ pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: *BaseState,
     };
 }
 
-pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
+pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
     var array = std.ArrayList(PValue).init(allocator);
     var s = stream;
 
@@ -195,7 +195,7 @@ pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, co
     return Result([]PValue).success(try array.toOwnedSlice(), s);
 }
 
-pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
+pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime SValue: type, sep: anytype) anyerror!Result([]PValue) {
     var array = std.ArrayList(PValue).init(allocator);
     var s = stream;
 
@@ -234,7 +234,7 @@ pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, c
     return Result([]PValue).success(try array.toOwnedSlice(), s);
 }
 
-pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime FValue: type, follow: anytype) anyerror!Result(PValue) {
+pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime FValue: type, follow: anytype) anyerror!Result(PValue) {
     switch (try runParser(stream, allocator, state, PValue, parser)) {
         .Result => |res| {
             switch (try runParser(res.rest, allocator, state, FValue, follow)) {
@@ -249,14 +249,14 @@ pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: *BaseS
     }
 }
 
-fn lscan(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
+fn lscan(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
     return switch (try runParser(stream, allocator, state, PValue, parser)) {
         .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
         .Error => |err| Result(PValue).failure(err.msg, err.rest),
     };
 }
 
-fn lrest(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
+fn lrest(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
     switch (try runParser(stream, allocator, state, OValue, op)) {
         .Result => |res| {
             const operator_fnc: *const fn (std.mem.Allocator, PValue, PValue) anyerror!PValue = res.value;
@@ -274,14 +274,14 @@ fn lrest(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, compti
     return Result(PValue).success(x, stream);
 }
 
-pub fn chainl1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
+pub fn chainl1(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
     return switch (try lscan(stream, allocator, state, PValue, parser, OValue, op)) {
         .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
         .Error => |err| Result(PValue).failure(err.msg, err.rest),
     };
 }
 
-pub fn chainl(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
+pub fn chainl(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype, x: PValue) anyerror!Result(PValue) {
     switch (try chainl1(stream, allocator, state, PValue, parser, OValue, op)) {
         .Result => |res| return Result(PValue).success(res.value, res.rest),
         .Error => |err| {
@@ -291,7 +291,7 @@ pub fn chainl(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, c
     }
 }
 
-pub fn untilNoAlloc(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, parser: anytype, comptime EValue: type, end: anytype) anyerror!Result([]const u8) {
+pub fn untilNoAlloc(stream: Stream, allocator: std.mem.Allocator, state: State, parser: anytype, comptime EValue: type, end: anytype) anyerror!Result([]const u8) {
     var s = stream;
     while (blk: {
         switch (try runParser(s, allocator, state, EValue, end)) {
@@ -318,7 +318,7 @@ pub fn untilNoAlloc(stream: Stream, allocator: std.mem.Allocator, state: *BaseSt
     return Result([]const u8).success(stream.diff(s), s);
 }
 
-pub fn until(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime PValue: type, parser: anytype, comptime EValue: type, end: anytype) anyerror!Result([]PValue) {
+pub fn until(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime EValue: type, end: anytype) anyerror!Result([]PValue) {
     var array = std.ArrayList(PValue).init(allocator);
 
     var s = stream;

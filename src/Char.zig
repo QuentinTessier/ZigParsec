@@ -1,11 +1,11 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
-const BaseState = @import("UserState.zig").BaseState;
+const State = @import("UserState.zig").State;
 
 const Result = @import("Result.zig").Result;
 
 // Tries to match 'c'
-pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, c: u8) anyerror!Result(u8) {
+pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: State, c: u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -25,7 +25,7 @@ pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, c: u8
 }
 
 // Match any character
-pub fn any(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn any(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -37,7 +37,7 @@ pub fn any(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror
 }
 
 // Match one of the character given in the array
-pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
+pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -59,7 +59,7 @@ pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []c
 }
 
 // Match none of the character given in the array
-pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []const u8) anyerror!Result(u8) {
+pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const u8) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -81,7 +81,7 @@ pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, x: []
 }
 
 // Match a character between l and h
-pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, l: u8, h: u8) anyerror!Result(u8) {
+pub fn range(stream: Stream, allocator: std.mem.Allocator, _: State, l: u8, h: u8) anyerror!Result(u8) {
     std.debug.assert(l < h);
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
@@ -101,7 +101,7 @@ pub fn range(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, l: u8,
 }
 
 // Match a uppercase letter
-pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -121,7 +121,7 @@ pub fn upper(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
 }
 
 // Match a lowercase letter
-pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -141,7 +141,7 @@ pub fn lower(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
 }
 
 // Match a upper or lowercase letter
-pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -161,7 +161,7 @@ pub fn alpha(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
 }
 
 // Match a upper or lowercase letter or a digit
-pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -181,7 +181,7 @@ pub fn alphaNum(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
 }
 
 // Match a digit
-pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -201,7 +201,7 @@ pub fn digit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
 }
 
 // Match a octal digit
-pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -226,7 +226,7 @@ pub fn octDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
 }
 
 // Match a hexadecimal digit
-pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -246,7 +246,7 @@ pub fn hexDigit(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) any
 }
 
 // Match a character statisfying the given function
-pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, fnc: *const fn (u8) bool) anyerror!Result(u8) {
+pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: State, fnc: *const fn (u8) bool) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -266,7 +266,7 @@ pub fn satisfy(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, fnc:
 }
 
 // Match a whitespace
-pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerror!Result(u8) {
+pub fn space(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();
@@ -286,7 +286,7 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator, _: *BaseState) anyerr
 }
 
 // Match multiple whitespaces
-pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Result(void) {
+pub fn spaces(stream: Stream, _: std.mem.Allocator, _: State) anyerror!Result(void) {
     if (stream.isEOF()) return Result(void).success(void{}, stream);
     const start = stream.currentLocation.index;
     var end = start;
@@ -297,7 +297,7 @@ pub fn spaces(stream: Stream, _: std.mem.Allocator, _: *BaseState) anyerror!Resu
 }
 
 // Match a given string
-pub fn string(stream: Stream, allocator: std.mem.Allocator, _: *BaseState, str: []const u8) anyerror!Result([]const u8) {
+pub fn string(stream: Stream, allocator: std.mem.Allocator, _: State, str: []const u8) anyerror!Result([]const u8) {
     if (stream.isEOF()) {
         var error_msg = std.ArrayList(u8).init(allocator);
         var writer = error_msg.writer();

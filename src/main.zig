@@ -1,6 +1,7 @@
 const std = @import("std");
 const Parser = @import("Parser.zig");
 const Expression = @import("./examples/Expression.zig");
+const Expr = @import("./Expression/Generator.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
