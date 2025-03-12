@@ -23,21 +23,24 @@ pub fn init(loc: Location) ParseError {
     };
 }
 
-pub fn deinit(self: *ParseError, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *const ParseError, allocator: std.mem.Allocator) void {
     for (self.expectedItems.items) |item| {
         item.deinit(allocator);
     }
-    self.expectedItems.deinit(allocator);
+    // Hack: Since I don't want to pay the cost of having the allocator in all ArrayList
+    // std.ArrayListUnmanaged(T).deinit(*@This()) takes a mutable to put the whole container to undefined (probably to catch use after deinit)
+    // This function needs to accept a *const ParseError to make this easier when handling it in a switch
+    allocator.free(self.expectedItems.allocatedSlice());
 
     for (self.contextItems.items) |item| {
         allocator.free(item);
     }
-    self.contextItems.deinit(allocator);
+    allocator.free(self.contextItems.allocatedSlice());
 
     for (self.childErrors.items) |*item| {
         item.deinit(allocator);
     }
-    self.childErrors.deinit(allocator);
+    allocator.free(self.childErrors.allocatedSlice());
 
     if (self.customMessage) |m| {
         allocator.free(m);
@@ -171,7 +174,7 @@ pub fn message(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []con
     self.customMessage = try std.fmt.allocPrint(allocator, fmt, args);
 }
 
-pub fn print(self: *@This(), stream: Stream, writer: std.io.AnyWriter, showContext: bool) !void {
+pub fn print(self: *const @This(), stream: Stream, writer: std.io.AnyWriter, showContext: bool) !void {
     try writer.print("{?s}:{}:{}: error: ", .{ stream.label, self.loc.line, self.loc.character });
     if (self.customMessage) |m| {
         try writer.print("\n{s}\n", .{m});
