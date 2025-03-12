@@ -40,6 +40,7 @@ pub inline fn runParser(stream: Stream, allocator: std.mem.Allocator, state: Sta
     return switch (@typeInfo(ParserWrapperType)) {
         .@"struct" => |s| if (s.is_tuple) @call(.auto, p[0], .{ stream, allocator, state } ++ p[1]) else @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args),
         .@"fn" => @call(.auto, p, .{ stream, allocator, state }),
+        .pointer => @call(.auto, p, .{ stream, allocator, state }),
         else => @panic("Invalid Parser given with type: " ++ @typeName(ParserWrapperType)),
     };
 }

@@ -20,7 +20,7 @@ pub fn ExpressionParserGenerator(comptime ExprType: type) type {
                     for (operators) |parser| {
                         switch (try parser(stream, allocator, state)) {
                             .Result => |res| return Result(PrefixOperator).success(res.value, res.rest),
-                            .Error => |err| err.msg.deinit(),
+                            .Error => |err| err.msg.deinit(allocator),
                         }
                     }
                     return Result(PrefixOperator).success(PrefixOperator.id(), stream);
@@ -31,7 +31,7 @@ pub fn ExpressionParserGenerator(comptime ExprType: type) type {
                     for (operators) |opParser| {
                         switch (opParser(stream, allocator, state)) {
                             .Result => |res| return Result(PostfixOperator).success(res.value, res.rest),
-                            .Error => |err| err.msg.deinit(),
+                            .Error => |err| err.msg.deinit(allocator),
                         }
                     }
                     return Result(PostfixOperator).success(PostfixOperator.id(), stream);
@@ -42,10 +42,10 @@ pub fn ExpressionParserGenerator(comptime ExprType: type) type {
                     for (operators) |opParser| {
                         switch (try opParser(stream, allocator, state)) {
                             .Result => |res| return Result(InfixOperator).success(res.value, res.rest),
-                            .Error => |err| err.msg.deinit(),
+                            .Error => |err| err.msg.deinit(allocator),
                         }
                     }
-                    return Result(InfixOperator).failure(std.ArrayList(u8).init(allocator), stream);
+                    return Result(InfixOperator).failure(Parser.ParseError.init(stream.currentLocation), stream);
                 }
 
                 fn prattTerm(stream: Stream, allocator: std.mem.Allocator, state: State, termP: anytype) anyerror!Result(ExprType) {
@@ -94,7 +94,7 @@ pub fn ExpressionParserGenerator(comptime ExprType: type) type {
                             }
                         },
                         .Error => |err| {
-                            err.msg.deinit();
+                            err.msg.deinit(allocator);
                             return Result(ExprType).success(left, stream);
                         },
                     }

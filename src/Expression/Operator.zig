@@ -65,7 +65,11 @@ pub fn OperatorTableGenerator(comptime ExprType: type) type {
                                 .prec = precedence,
                                 .builder = builder,
                             }, res.rest),
-                            .Error => |err| Result(InfixOperator).failure(err.msg, err.rest),
+                            .Error => |err| blk: {
+                                var local_error: Parser.ParseError = .init(err.rest.currentLocation);
+                                try local_error.addChild(allocator, &err.msg);
+                                break :blk Result(InfixOperator).failure(local_error, err.rest);
+                            },
                         };
                     }
                 }.inlineParser;
@@ -97,14 +101,18 @@ pub fn OperatorTableGenerator(comptime ExprType: type) type {
                                 .symbol = res.value,
                                 .builder = builder,
                             }, res.rest),
-                            .Error => |err| Result(PrefixOperator).failure(err.msg, err.rest),
+                            .Error => |err| blk: {
+                                var local_error: Parser.ParseError = .init(err.rest.currentLocation);
+                                try local_error.addChild(allocator, &err.msg);
+                                break :blk Result(PrefixOperator).failure(local_error, err.rest);
+                            },
                         };
                     }
                 }.inlineParser;
             }
         };
 
-        pub const PostfixOperatorParser = *const fn (Stream, std.mem.Allocator, State) anyerror!Result(PrefixOperator);
+        pub const PostfixOperatorParser = *const fn (Stream, std.mem.Allocator, State) anyerror!Result(PostfixOperator);
         pub const PostfixOperatorBuilder = *const fn (std.mem.Allocator, ExprType) anyerror!ExprType;
         pub const PostfixOperator = struct {
             symbol: []const u8,
@@ -123,13 +131,17 @@ pub fn OperatorTableGenerator(comptime ExprType: type) type {
 
             pub fn new(parser: anytype, comptime builder: PostfixOperatorBuilder) PostfixOperatorParser {
                 return struct {
-                    pub fn inlineParser(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result(PrefixOperator) {
+                    pub fn inlineParser(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result(PostfixOperator) {
                         return switch (try runParser(stream, allocator, state, []const u8, parser)) {
                             .Result => |res| Result(PostfixOperator).success(PostfixOperator{
                                 .symbol = res.value,
                                 .builder = builder,
                             }, res.rest),
-                            .Error => |err| Result(PostfixOperator).failure(err.msg, err.rest),
+                            .Error => |err| blk: {
+                                var local_error: Parser.ParseError = .init(err.rest.currentLocation);
+                                try local_error.addChild(allocator, &err.msg);
+                                break :blk Result(PostfixOperator).failure(local_error, err.rest);
+                            },
                         };
                     }
                 }.inlineParser;
