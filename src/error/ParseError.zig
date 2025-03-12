@@ -7,7 +7,7 @@ pub const Location = @import("../Stream.zig").Location;
 // TODO: No copy function for expected, context and message if the user already allocated with the given allocator
 pub const ParseError = @This();
 
-loc: Location,
+loc: Location, // TODO: Make a span so the '~' part of the message has the right length
 expectedItems: std.ArrayListUnmanaged(ExpectedItem),
 contextItems: std.ArrayListUnmanaged([]u8),
 customMessage: ?[]u8,
@@ -71,7 +71,7 @@ pub fn copy(self: *const ParseError, allocator: std.mem.Allocator) !ParseError {
     };
 }
 
-pub fn addChild(self: *ParseError, allocator: std.mem.Allocator, other: *ParseError) !void {
+pub fn addChild(self: *ParseError, allocator: std.mem.Allocator, other: *const ParseError) !void {
     for (other.expectedItems.items) |new| {
         for (self.expectedItems.items) |contained| {
             if (new.eql(&contained)) break;
@@ -139,21 +139,21 @@ pub fn findFurthest(errors: []const ParseError) usize {
     return index;
 }
 
-pub fn expectedToken(self: *@This(), allocator: std.mem.Allocator, token: []const u8) !void {
+pub fn expectedToken(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
     try self.expectedItems.append(allocator, .{
-        .token = try allocator.dupe(u8, token),
+        .token = try std.fmt.allocPrint(allocator, fmt, args),
     });
 }
 
-pub fn expectedPattern(self: *@This(), allocator: std.mem.Allocator, pattern: []const u8) !void {
+pub fn expectedPattern(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
     try self.expectedItems.append(allocator, .{
-        .pattern = try allocator.dupe(u8, pattern),
+        .pattern = try std.fmt.allocPrint(allocator, fmt, args),
     });
 }
 
-pub fn expectedCustom(self: *@This(), allocator: std.mem.Allocator, custom: []const u8) !void {
+pub fn expectedCustom(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
     try self.expectedItems.append(allocator, .{
-        .custom = try allocator.dupe(u8, custom),
+        .custom = try std.fmt.allocPrint(allocator, fmt, args),
     });
 }
 
@@ -167,10 +167,14 @@ pub fn withContext(self: *@This(), allocator: std.mem.Allocator, context: []cons
     try self.contextItems.append(allocator, try allocator.dupe(u8, context));
 }
 
+pub fn message(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
+    self.customMessage = try std.fmt.allocPrint(allocator, fmt, args);
+}
+
 pub fn print(self: *@This(), stream: Stream, writer: std.io.AnyWriter, showContext: bool) !void {
     try writer.print("{?s}:{}:{}: error: ", .{ stream.label, self.loc.line, self.loc.character });
-    if (self.customMessage) |message| {
-        try writer.print("\n{s}\n", .{message});
+    if (self.customMessage) |m| {
+        try writer.print("\n{s}\n", .{m});
     } else {
         try writer.writeByte('\n');
     }
@@ -208,4 +212,19 @@ pub fn print(self: *@This(), stream: Stream, writer: std.io.AnyWriter, showConte
         try writer.writeByte(' ');
     }
     _ = try writer.write("^~~\n");
+}
+
+pub fn merge(allocator: std.mem.Allocator, errors: []ParseError) !ParseError {
+    const index = findFurthest(errors);
+    const selected = &errors[index];
+
+    for (errors, 0..) |*err, i| {
+        if (i != index and err.loc.index == selected.loc.index) {
+            try selected.addChild(allocator, err);
+        } else if (i != index) {
+            err.deinit(allocator);
+        }
+    }
+
+    return selected.*;
 }

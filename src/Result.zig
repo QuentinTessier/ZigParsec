@@ -1,5 +1,6 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
+pub const ParseError = @import("error/ParseError.zig");
 
 pub fn EitherResultOrError(comptime Value: type, comptime Err: type) type {
     return union(enum(u32)) {
@@ -28,8 +29,6 @@ pub fn EitherResultOrError(comptime Value: type, comptime Err: type) type {
         }
     };
 }
-
-pub const ParseError = std.ArrayList(u8);
 
 pub fn Result(comptime Value: type) type {
     return EitherResultOrError(Value, ParseError);
