@@ -1,7 +1,7 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
 
-fn EitherResultOrError(comptime Value: type, comptime Err: type) type {
+pub fn EitherResultOrError(comptime Value: type, comptime Err: type) type {
     return union(enum(u32)) {
         Result: struct {
             value: Value,

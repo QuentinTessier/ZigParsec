@@ -70,6 +70,15 @@ pub fn format(self: Stream, comptime _: []const u8, _: std.fmt.FormatOptions, wr
     return std.fmt.format(writer, "{s}:{}:{}", .{ if (self.label) |label| label else "(null)", self.currentLocation.line, self.currentLocation.character });
 }
 
+pub fn line(self: *const Stream, location: Location) []const u8 {
+    var index = location.index;
+    while (index > 0 and self.data[index] != '\n') : (index -= 1) {}
+
+    const start = index;
+    const end = std.mem.indexOfScalarPos(u8, self.data, location.index, '\n') orelse self.data.len;
+    return self.data[start..end];
+}
+
 test "remaining" {
     const s = Stream.init("stream", null);
     std.testing.expect(s.remaining() == 6);
