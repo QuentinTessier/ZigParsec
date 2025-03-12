@@ -1,7 +1,5 @@
 const std = @import("std");
-pub const ExampleMath = @import("examples/math.zig");
 pub const State = @import("UserState.zig").State;
-pub const MakeUserStateType = @import("UserState.zig").MakeUserStateType;
 pub const Result = @import("Result.zig").Result;
 pub const ParseError = @import("Result.zig").ParseError;
 
@@ -11,7 +9,7 @@ pub const ParseError = @import("Result.zig").ParseError;
 pub const Stream = @import("Stream.zig");
 pub const Char = @import("Char.zig");
 pub const Combinator = @import("Combinator.zig");
-pub const Language = @import("Language.zig");
+//pub const Language = @import("Language.zig");
 pub const Expr = @import("./Expression/Generator.zig");
 
 pub fn pure(stream: Stream, _: std.mem.Allocator, _: State) anyerror!Result(void) {
@@ -19,17 +17,17 @@ pub fn pure(stream: Stream, _: std.mem.Allocator, _: State) anyerror!Result(void
 }
 
 pub fn noop(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(void) {
-    var error_msg: ParseError = ParseError.init(allocator);
-    try error_msg.appendSlice("Encountered parser NOOP");
-    return Result(void).failure(error_msg, stream);
+    var local_err: ParseError = .init(stream.currentLocation);
+    try local_err.message(allocator, "Encountered parser NOOP", .{});
+    try local_err.withContext(allocator, "noop");
+    return Result(void).failure(local_err, stream);
 }
 
 pub fn eof(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(void) {
     if (stream.isEOF()) return Result(void).success(void{}, stream);
-    var error_msg = std.ArrayList(u8).init(allocator);
-    var writer = error_msg.writer();
-    try writer.print("{}: Expected EndOfStream", .{stream});
-    return Result(void).failure(error_msg, stream);
+    var local_err: ParseError = .init(stream.currentLocation);
+    try local_err.expectedEof(allocator);
+    return Result(void).failure(local_err, stream);
 }
 
 // T: return type of the given parser
@@ -42,13 +40,7 @@ pub inline fn runParser(stream: Stream, allocator: std.mem.Allocator, state: Sta
     return switch (@typeInfo(ParserWrapperType)) {
         .@"struct" => |s| if (s.is_tuple) @call(.auto, p[0], .{ stream, allocator, state } ++ p[1]) else @call(.auto, p.parser, .{ stream, allocator, state } ++ p.args),
         .@"fn" => @call(.auto, p, .{ stream, allocator, state }),
-        else => blk: {
-            if (std.debug.runtime_safety) @panic("Invalid Parser given with type: " ++ @typeName(ParserWrapperType));
-            var msg = std.ArrayList(u8).init(allocator);
-            var writer = msg.writer();
-            try writer.print("Invalid Parser given with type: {s}", .{@typeName(ParserWrapperType)});
-            break :blk Result(T).failure(msg, stream);
-        },
+        else => @panic("Invalid Parser given with type: " ++ @typeName(ParserWrapperType)),
     };
 }
 
@@ -58,11 +50,11 @@ pub inline fn label(stream: Stream, allocator: std.mem.Allocator, state: State, 
     switch (r) {
         .Result => return r,
         .Error => |err| {
-            var error_msg = std.ArrayList(u8).init(allocator);
-            var writer = error_msg.writer();
-            try writer.print("{}: {s}", .{ stream, str });
-            err.msg.deinit();
-            return Result([]Value).failure(error_msg, stream);
+            var local_err: ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.withContext(allocator, "label");
+            try local_err.message(allocator, "{s}", .{str}); // TODO: Check if message already exist
+            return Result(Value).failure(local_err, stream);
         },
     }
 }
@@ -77,7 +69,12 @@ pub inline fn ret(stream: Stream, _: std.mem.Allocator, _: State, comptime Value
 pub inline fn map(stream: Stream, allocator: std.mem.Allocator, state: State, comptime From: type, fParser: anytype, comptime To: type, tFnc: *const fn (std.mem.Allocator, From) anyerror!To) anyerror!Result(To) {
     return switch (try runParser(stream, allocator, state, From, fParser)) {
         .Result => |res| Result(To).success(try tFnc(allocator, res.value), res.rest),
-        .Error => |err| Result(To).failure(err.msg, err.rest),
+        .Error => |err| blk: {
+            var local_err: ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.withContext(allocator, "map");
+            break :blk Result(To).failure(local_err, err.rest);
+        },
     };
 }
 
@@ -115,7 +112,12 @@ pub fn toStruct(stream: Stream, allocator: std.mem.Allocator, state: State, comp
                 .Result => |res| {
                     str = res.rest;
                 },
-                .Error => |err| return Result(S).failure(err.msg, err.rest),
+                .Error => |err| {
+                    var local_err: ParseError = .init(stream.currentLocation);
+                    try local_err.addChild(allocator, &err.msg);
+                    try local_err.withContext(allocator, "toStruct");
+                    return Result(S).failure(local_err, err.rest);
+                },
             }
         } else {
             const field = maybe_field;
@@ -124,7 +126,12 @@ pub fn toStruct(stream: Stream, allocator: std.mem.Allocator, state: State, comp
                     @field(s, std.meta.fieldInfo(S, field).name) = res.value;
                     str = res.rest;
                 },
-                .Error => |err| return Result(S).failure(err.msg, err.rest),
+                .Error => |err| {
+                    var local_err: ParseError = .init(stream.currentLocation);
+                    try local_err.addChild(allocator, &err.msg);
+                    try local_err.withContext(allocator, "toStruct");
+                    return Result(S).failure(local_err, err.rest);
+                },
             }
         }
     }
@@ -149,9 +156,8 @@ pub fn toTaggedUnion(stream: Stream, allocator: std.mem.Allocator, state: State,
         @panic("");
     }
 
-    var error_msg = std.ArrayList(u8).init(allocator);
-    var writer = error_msg.writer();
-    try writer.print("{}: Choice Parser:\n", .{stream});
+    var error_array: std.ArrayList(ParseError) = .initCapacity(allocator, mapped_parsers.len);
+    defer error_array.deinit();
     inline for (mapped_parsers) |field_parser_tuple| {
         const field = field_parser_tuple[0];
         const t = field_parser_tuple[1];
@@ -159,14 +165,15 @@ pub fn toTaggedUnion(stream: Stream, allocator: std.mem.Allocator, state: State,
 
         switch (try runParser(stream, allocator, state, t, parser)) {
             .Result => |res| {
-                error_msg.deinit();
                 return Result(U).success(@unionInit(U, std.meta.fieldInfo(U, field).name, res.value), res.rest);
             },
             .Error => |err| {
-                try writer.print("\t{s}\n", .{err.msg.items});
-                err.msg.deinit();
+                error_array.appendAssumeCapacity(err.msg);
             },
         }
     }
-    return Result(U).failure(error_msg, stream);
+
+    var merged_error = try ParseError.merge(allocator, error_array.items);
+    try merged_error.withContext(allocator, "toUnion");
+    return Result(U).failure(merged_error, stream);
 }

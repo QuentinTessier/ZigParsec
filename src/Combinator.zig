@@ -1,7 +1,10 @@
 const std = @import("std");
 const Stream = @import("Stream.zig");
+const ParseError = @import("error/ParseError.zig");
 const Result = @import("Result.zig").Result;
 const State = @import("UserState.zig").State;
+
+const symbol = @import("Char.zig").symbol;
 
 const runParser = @import("Parser.zig").runParser;
 
@@ -17,7 +20,7 @@ pub fn many(stream: Stream, allocator: std.mem.Allocator, state: State, comptime
                 try array.append(res.value);
             },
             .Error => |err| {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break;
             },
         }
@@ -25,35 +28,46 @@ pub fn many(stream: Stream, allocator: std.mem.Allocator, state: State, comptime
     return Result([]Value).success(try array.toOwnedSlice(), s);
 }
 
+test "many no input" {
+    const stream: Stream = .init("", "test");
+    const state: State = .{};
+
+    const res = try many(stream, std.testing.allocator, state, u8, .{ symbol, .{'a'} });
+    try std.testing.expect(res == .Result);
+    try std.testing.expectEqual(res.Result.value.len, 0);
+    try std.testing.expect(res.Result.rest.isEOF());
+}
+
 // Apply parser p one or more time
 pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, p: anytype) anyerror!Result([]Value) {
     var array = std.ArrayList(Value).init(allocator);
     var s = stream;
-    var r: Result(Value) = undefined;
-    var count: usize = 0;
+    var r: Result(Value) = try runParser(s, allocator, state, Value, p);
+    switch (r) {
+        .Result => |res| {
+            s = res.rest;
+            try array.append(res.value);
+        },
+        .Error => |err| {
+            var local_err: ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err);
+            try local_err.message(allocator, "expected at list on {s} found 0", .{@typeName(Value)});
+            return Result([]Value).failure(local_err, stream);
+        },
+    }
+
     while (true) {
         r = try runParser(s, allocator, state, Value, p);
         switch (r) {
             .Result => |res| {
-                count += 1;
                 s = res.rest;
                 try array.append(res.value);
             },
-            .Error => |err| {
-                if (count != 0) {
-                    err.msg.deinit();
-                }
+            .Error => |_| {
+                r.Error.msg.deinit(allocator);
                 break;
             },
         }
-    }
-    if (count == 0) {
-        array.deinit();
-        var error_msg = std.ArrayList(u8).init(allocator);
-        var writer = error_msg.writer();
-        try writer.print("{}: Expected at least one element, found:\n\t{s}", .{ stream, r.Error.msg.items });
-        r.Error.msg.deinit();
-        return Result([]Value).failure(error_msg, stream);
     }
     return Result([]Value).success(try array.toOwnedSlice(), s);
 }
@@ -78,23 +92,26 @@ pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: State, comp
 
 // Run the given parsers sequentialy and return the first successful parser
 pub fn choice(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Value: type, parsers: anytype) anyerror!Result(Value) {
-    var error_msg = std.ArrayList(u8).init(allocator);
-    var writer = error_msg.writer();
-    try writer.print("{}: Choice Parser:\n", .{stream});
+    var error_array: std.ArrayList(ParseError) = try .initCapacity(allocator, parsers.len);
+    defer error_array.deinit();
+
     inline for (parsers) |p| {
         const r = try runParser(stream, allocator, state, Value, p);
         switch (r) {
             .Result => {
-                error_msg.deinit();
+                for (error_array.items) |*msg| {
+                    msg.deinit(allocator);
+                }
                 return r;
             },
             .Error => |err| {
-                try writer.print("\t{s}\n", .{err.msg.items});
-                err.msg.deinit();
+                error_array.appendAssumeCapacity(err.msg);
             },
         }
     }
-    return Result(Value).failure(error_msg, stream);
+    var merged_error = try ParseError.merge(allocator, error_array.items);
+    try merged_error.withContext(allocator, "choice");
+    return Result(Value).failure(merged_error, stream);
 }
 
 pub fn between(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Values: [3]type, start: anytype, parser: anytype, end: anytype) anyerror!Result(Values[1]) {
@@ -104,13 +121,28 @@ pub fn between(stream: Stream, allocator: std.mem.Allocator, state: State, compt
                 .Result => |res_parser| {
                     switch (try runParser(res_parser.rest, allocator, state, Values[2], end)) {
                         .Result => |res_end| return Result(Values[1]).success(res_parser.value, res_end.rest),
-                        .Error => |err| return Result(Values[1]).failure(err.msg, err.rest),
+                        .Error => |err| {
+                            var local_error: ParseError = .init(err.rest.currentLocation);
+                            try local_error.addChild(allocator, &err.msg);
+                            try local_error.withContext(allocator, "between");
+                            return Result(Values[1]).failure(local_error, stream);
+                        },
                     }
                 },
-                .Error => |err| return Result(Values[1]).failure(err.msg, err.rest),
+                .Error => |err| {
+                    var local_error: ParseError = .init(err.rest.currentLocation);
+                    try local_error.addChild(allocator, &err.msg);
+                    try local_error.withContext(allocator, "between");
+                    return Result(Values[1]).failure(local_error, stream);
+                },
             }
         },
-        .Error => |err| return Result(Values[1]).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_error: ParseError = .init(err.rest.currentLocation);
+            try local_error.addChild(allocator, &err.msg);
+            try local_error.withContext(allocator, "between");
+            return Result(Values[1]).failure(local_error, stream);
+        },
     }
 }
 
@@ -133,9 +165,14 @@ pub fn optionMaybe(stream: Stream, allocator: std.mem.Allocator, state: State, c
         .Result => |res| Result(?Value).success(res.value, res.rest),
         .Error => |err| blk: {
             if (stream.diff(err.rest).len == 0) {
-                err.msg.deinit();
+                r.Error.msg.deinit(allocator);
                 break :blk Result(?Value).success(null, err.rest);
-            } else break :blk Result(?Value).convertError(r);
+            } else {
+                var local_err: ParseError = .init(stream.currentLocation);
+                try local_err.addChild(allocator, &err.msg);
+                try local_err.withContext(allocator, "optionMaybe");
+                break :blk Result(?Value).failure(local_err, err.rest);
+            }
         },
     };
 }
@@ -148,7 +185,12 @@ pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: State, comp
             if (stream.diff(err.rest).len == 0) {
                 err.msg.deinit();
                 break :blk Result(void).success(void{}, err.rest);
-            } else break :blk Result(void).convertError(r);
+            } else {
+                var local_err: ParseError = .init(stream.currentLocation);
+                try local_err.addChild(allocator, &err.msg);
+                try local_err.withContext(allocator, "optional");
+                break :blk Result(?Value).failure(local_err, err.rest);
+            }
         },
     };
 }
@@ -187,7 +229,10 @@ pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
             },
             .Error => |err| {
                 array.deinit();
-                return Result([]PValue).failure(err.msg, err.rest);
+                var local_error: ParseError = .init(s.currentLocation);
+                try local_error.addChild(allocator, &err.msg);
+                try local_error.withContext(allocator, "sepBy");
+                return Result([]PValue).failure(local_error, err.rest);
             },
         }
     }
@@ -204,7 +249,13 @@ pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: State, compti
             try array.append(res.value);
             s = res.rest;
         },
-        .Error => |err| return Result([]PValue).failure(err.msg, err.rest),
+        .Error => |err| {
+            array.deinit();
+            var local_error: ParseError = .init(s.currentLocation);
+            try local_error.addChild(allocator, &err.msg);
+            try local_error.withContext(allocator, "sepBy1");
+            return Result([]PValue).failure(local_error, err.rest);
+        },
     }
 
     while (run: {
@@ -226,7 +277,10 @@ pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: State, compti
             },
             .Error => |err| {
                 array.deinit();
-                return Result([]PValue).failure(err.msg, err.rest);
+                var local_error: ParseError = .init(s.currentLocation);
+                try local_error.addChild(allocator, &err.msg);
+                try local_error.withContext(allocator, "sepBy1");
+                return Result([]PValue).failure(local_error, err.rest);
             },
         }
     }
@@ -245,14 +299,24 @@ pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: State,
                 },
             }
         },
-        .Error => |err| return Result(PValue).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_error: ParseError = .init(stream.currentLocation);
+            try local_error.addChild(allocator, &err.msg);
+            try local_error.withContext(allocator, "notFollowedBy");
+            return Result(PValue).failure(local_error, err.rest);
+        },
     }
 }
 
 fn lscan(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
     return switch (try runParser(stream, allocator, state, PValue, parser)) {
         .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
-        .Error => |err| Result(PValue).failure(err.msg, err.rest),
+        .Error => |err| blk: {
+            var local_error: ParseError = .init(stream.currentLocation);
+            try local_error.addChild(allocator, &err.msg);
+            try local_error.withContext(allocator, "lscan");
+            break :blk Result(PValue).failure(local_error, err.rest);
+        },
     };
 }
 
@@ -263,12 +327,12 @@ fn lrest(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PV
             switch (try lscan(res.rest, allocator, state, PValue, parser, OValue, op)) {
                 .Result => |res2| return Result(PValue).success(try operator_fnc(allocator, x, res2.value), res2.rest),
                 .Error => |err| {
-                    err.msg.deinit();
+                    err.msg.deinit(allocator);
                 },
             }
         },
         .Error => |err| {
-            err.msg.deinit();
+            err.msg.deinit(allocator);
         },
     }
     return Result(PValue).success(x, stream);
@@ -277,7 +341,12 @@ fn lrest(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PV
 pub fn chainl1(stream: Stream, allocator: std.mem.Allocator, state: State, comptime PValue: type, parser: anytype, comptime OValue: type, op: anytype) anyerror!Result(PValue) {
     return switch (try lscan(stream, allocator, state, PValue, parser, OValue, op)) {
         .Result => |res| lrest(res.rest, allocator, state, PValue, parser, OValue, op, res.value),
-        .Error => |err| Result(PValue).failure(err.msg, err.rest),
+        .Error => |err| blk: {
+            var local_error: ParseError = .init(stream.currentLocation);
+            try local_error.addChild(allocator, &err.msg);
+            try local_error.withContext(allocator, "chainl1");
+            break :blk Result(PValue).failure(local_error, err.rest);
+        },
     };
 }
 
@@ -285,7 +354,7 @@ pub fn chainl(stream: Stream, allocator: std.mem.Allocator, state: State, compti
     switch (try chainl1(stream, allocator, state, PValue, parser, OValue, op)) {
         .Result => |res| return Result(PValue).success(res.value, res.rest),
         .Error => |err| {
-            err.msg.deinit();
+            err.msg.deinit(allocator);
             return Result(PValue).success(x, err.rest);
         },
     }
@@ -311,7 +380,10 @@ pub fn untilNoAlloc(stream: Stream, allocator: std.mem.Allocator, state: State, 
                 s = res.rest;
             },
             .Error => |err| {
-                return Result([]const u8).failure(err.msg, err.rest);
+                var local_error: ParseError = .init(stream.currentLocation);
+                try local_error.addChild(allocator, &err.msg);
+                try local_error.withContext(allocator, "untilNoAlloc");
+                return Result([]const u8).failure(local_error, err.rest);
             },
         }
     }
@@ -342,7 +414,10 @@ pub fn until(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
             },
             .Error => |err| {
                 array.deinit();
-                return Result([]PValue).failure(err.msg, err.rest);
+                var local_error: ParseError = .init(stream.currentLocation);
+                try local_error.addChild(allocator, &err.msg);
+                try local_error.withContext(allocator, "until");
+                return Result([]PValue).failure(local_error, err.rest);
             },
         }
     }

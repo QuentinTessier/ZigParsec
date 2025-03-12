@@ -28,7 +28,7 @@ pub fn symbol(stream: Stream, allocator: std.mem.Allocator, _: State, c: u8) any
 pub fn any(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Result(u8) {
     if (stream.isEOF()) {
         var err: ParseError = .init(stream.currentLocation);
-        try err.expectedPattern(allocator, allocator, "character", .{});
+        try err.expectedPattern(allocator, "character", .{});
         try err.withContext(allocator, "any");
         return Result(u8).failure(err, stream);
     }
@@ -40,7 +40,7 @@ pub fn any(stream: Stream, allocator: std.mem.Allocator, _: State) anyerror!Resu
 pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const u8) anyerror!Result(u8) {
     var err: ParseError = .init(stream.currentLocation);
     if (stream.isEOF()) {
-        try err.expectedPattern(allocator, "noneOf({c})", x);
+        try err.expectedPattern(allocator, "noneOf({c})", .{x});
         try err.withContext(allocator, "oneOf");
         return Result(u8).failure(err, stream);
     }
@@ -52,7 +52,7 @@ pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const 
         }
     }
 
-    try err.expectedPattern(allocator, "noneOf({c})", x);
+    try err.expectedPattern(allocator, "noneOf({c})", .{x});
     try err.withContext(allocator, "oneOf");
     return Result(u8).failure(err, stream);
 }
@@ -61,7 +61,7 @@ pub fn oneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const 
 pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const u8) anyerror!Result(u8) {
     var err: ParseError = .init(stream.currentLocation);
     if (stream.isEOF()) {
-        try err.expectedToken(allocator, "noneOf({})", x);
+        try err.expectedToken(allocator, "noneOf({c})", .{x});
         try err.withContext(allocator, "noneOf");
         return Result(u8).failure(err, stream);
     }
@@ -69,7 +69,7 @@ pub fn noneOf(stream: Stream, allocator: std.mem.Allocator, _: State, x: []const
     const peeked = stream.peek(1);
     for (x) |c| {
         if (peeked[0] == c) {
-            try err.expectedToken(allocator, "noneOf({})", x);
+            try err.expectedToken(allocator, "noneOf({c})", .{x});
             try err.withContext(allocator, "noneOf");
             return Result(u8).failure(err, stream);
         }
@@ -291,7 +291,7 @@ pub fn string(stream: Stream, allocator: std.mem.Allocator, _: State, str: []con
     if (stream.isEOF()) {
         try err.expectedToken(allocator, "\"{s}\"", .{str});
         try err.withContext(allocator, "string");
-        return Result(u8).failure(err, stream);
+        return Result([]const u8).failure(err, stream);
     }
 
     const peeked = stream.peek(str.len);
@@ -301,5 +301,5 @@ pub fn string(stream: Stream, allocator: std.mem.Allocator, _: State, str: []con
 
     try err.expectedToken(allocator, "\"{s}\"", .{str});
     try err.withContext(allocator, "string");
-    return Result(u8).failure(err, stream);
+    return Result([]const u8).failure(err, stream);
 }

@@ -48,21 +48,21 @@ pub fn deinit(self: *const ParseError, allocator: std.mem.Allocator) void {
 }
 
 pub fn copy(self: *const ParseError, allocator: std.mem.Allocator) !ParseError {
-    const copyExpectedItems: std.ArrayListUnmanaged(ExpectedItem) = .initCapacity(allocator, self.expectedItems.items.len);
+    var copyExpectedItems: std.ArrayListUnmanaged(ExpectedItem) = try .initCapacity(allocator, self.expectedItems.items.len);
     for (self.expectedItems.items) |item| {
         copyExpectedItems.appendAssumeCapacity(try item.copy(allocator));
     }
 
-    const copyContextItems: std.ArrayListUnmanaged([]u8) = .initCapacity(allocator, self.contextItems.items.len);
+    var copyContextItems: std.ArrayListUnmanaged([]u8) = try .initCapacity(allocator, self.contextItems.items.len);
     for (self.contextItems.items) |item| {
         copyContextItems.appendAssumeCapacity(try allocator.dupe(u8, item));
     }
 
     const copyCustomMessage: ?[]u8 = if (self.customMessage) |m| try allocator.dupe(u8, m) else null;
 
-    const copyChildErrors: std.ArrayListUnmanaged(ParseError) = .initCapacity(allocator, self.childErrors.items.len);
+    var copyChildErrors: std.ArrayListUnmanaged(ParseError) = try .initCapacity(allocator, self.childErrors.items.len);
     for (self.childErrors.items) |*item| {
-        copyChildErrors.append(allocator, try item.copy(allocator));
+        try copyChildErrors.append(allocator, try item.copy(allocator));
     }
 
     return .{

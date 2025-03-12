@@ -71,7 +71,7 @@ pub fn format(self: Stream, comptime _: []const u8, _: std.fmt.FormatOptions, wr
 }
 
 pub fn line(self: *const Stream, location: Location) []const u8 {
-    var index = location.index;
+    var index = if (location.index >= self.data.len) self.data.len - 1 else location.index;
     while (index > 0 and self.data[index] != '\n') : (index -= 1) {}
 
     const start = index;
@@ -81,12 +81,12 @@ pub fn line(self: *const Stream, location: Location) []const u8 {
 
 test "remaining" {
     const s = Stream.init("stream", null);
-    std.testing.expect(s.remaining() == 6);
+    try std.testing.expect(s.remaining() == 6);
 }
 
 test "diff" {
     const s = Stream.init("stream", null);
     const s1 = s.eat(1);
 
-    std.testing.expectEqual(s.diff(s1), "tream");
+    try std.testing.expectEqualSlices(u8, s.diff(s1), "s");
 }

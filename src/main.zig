@@ -1,46 +1,5 @@
 const std = @import("std");
-const Stream = @import("./Stream.zig");
-const ParserResult = @import("./Result.zig").EitherResultOrError;
-const ParseError = @import("./error/ParseError.zig");
-
-const revolution: u32 = 3;
-var current_index: u64 = 0;
-
-pub fn errorGenerate(allocator: std.mem.Allocator, seed: u32) !ParseError {
-    const loc: ParseError.Location = .{
-        .index = current_index,
-    };
-
-    var err: ParseError = .init(loc);
-    var buffer: [256]u8 = undefined;
-    const context = try std.fmt.bufPrint(&buffer, "context_{}", .{seed});
-    try err.contextItems.append(allocator, try allocator.dupe(u8, context));
-
-    const pattern = try std.fmt.bufPrint(&buffer, "pattern_{}", .{seed});
-    try err.expectedItems.append(allocator, .{ .pattern = try allocator.dupe(u8, pattern) });
-    if (@mod(seed, revolution) == 0) {
-        current_index += 1;
-    }
-
-    return err;
-}
-
-pub fn symbol(stream: Stream, allocator: std.mem.Allocator, c: u8) anyerror!ParserResult(u8, ParseError) {
-    var err: ParseError = .init(stream.currentLocation);
-    if (stream.isEOF()) {
-        try err.expectedToken(allocator, &[1]u8{c});
-        return ParserResult(u8, ParseError).failure(err, stream);
-    }
-
-    const peeked = stream.peek(1);
-    if (peeked[0] == c) {
-        return ParserResult(u8, ParseError).success(c, stream.eat(1));
-    }
-
-    try err.expectedToken(allocator, &[1]u8{c});
-    try err.withContext(allocator, "symbol");
-    return ParserResult(u8, ParseError).failure(err, stream);
-}
+const Parser = @import("Parser.zig");
 
 pub fn main() !void {
     var instance: std.heap.DebugAllocator(.{}) = .init;
@@ -48,17 +7,27 @@ pub fn main() !void {
 
     const allocator = instance.allocator();
 
-    const stdout = std.io.getStdOut();
+    const stream: Parser.Stream = .init("", null);
+    const state: Parser.State = .{};
 
-    const stream: Stream = .init("bbzjgzepgjzg\nofpzjgzogoz", "stdin");
-    var r = try symbol(stream, allocator, 'a');
-    switch (r) {
-        .Result => |result| {
-            std.log.info("{}", .{result.value});
+    switch (try Parser.Combinator.many(stream, allocator, state, u8, Parser.Char.alpha)) {
+        .Error => |err| {
+            try err.msg.print(stream, std.io.getStdOut().writer().any(), true);
+            err.msg.deinit(allocator);
         },
-        .Error => |_| {
-            try r.Error.msg.print(stream, stdout.writer().any(), false);
-            r.Error.msg.deinit(allocator);
+        .Result => |res| {
+            std.log.info("|{s}|", .{res.value});
+            allocator.free(res.value);
         },
     }
+}
+
+test "many no input" {
+    const stream: Parser.Stream = .init("", "test");
+    const state: Parser.State = .{};
+
+    const res = try Parser.Combinator.many(stream, std.testing.allocator, state, u8, .{ Parser.Char.symbol, .{'a'} });
+    try std.testing.expect(res == .Result);
+    try std.testing.expectEqual(res.Result.value.len, 0);
+    try std.testing.expect(res.Result.rest.isEOF());
 }

@@ -1,11 +1,11 @@
 const std = @import("std");
 const Parser = @import("Parser.zig");
 const Stream = @import("Stream.zig");
-const BaseState = @import("UserState.zig").BaseState;
+const State = @import("UserState.zig").State;
 const Result = @import("Result.zig").Result;
 const runParser = Parser.runParser;
 
-fn identifierChar(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime isFirstChar: bool) anyerror!Result(u8) {
+fn identifierChar(stream: Stream, allocator: std.mem.Allocator, state: State, comptime isFirstChar: bool) anyerror!Result(u8) {
     return Parser.Combinator.choice(stream, allocator, state, u8, if (isFirstChar) .{
         Parser.Char.alpha,
         .{ Parser.Char.symbol, .{'_'} },
@@ -17,7 +17,7 @@ fn identifierChar(stream: Stream, allocator: std.mem.Allocator, state: *BaseStat
 
 // Parse a C style identifier.
 // ('A'...'Z' or 'a' ... 'z' or '_') ['A'...'Z' or 'a' ... 'z' or '0' ... '9' or '_']
-pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result([]u8) {
+pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result([]u8) {
     switch (try identifierChar(stream, allocator, state, true)) {
         .Result => |res| {
             var s = res.rest;
@@ -40,15 +40,15 @@ pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: *BaseStat
 }
 
 // Parse the given string and making sure it isn't part of a longer identifier.
-pub fn reserved(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, name: []const u8) anyerror!Result([]const u8) {
+pub fn reserved(stream: Stream, allocator: std.mem.Allocator, state: State, name: []const u8) anyerror!Result([]const u8) {
     return Parser.Combinator.notFollowedBy(stream, allocator, state, []const u8, .{ .parser = Parser.Char.string, .args = .{name} }, u8, Parser.Char.alphaNum);
 }
 
-inline fn operator1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, symbol: []const u8) anyerror!Result([]const u8) {
+inline fn operator1(stream: Stream, allocator: std.mem.Allocator, state: State, symbol: []const u8) anyerror!Result([]const u8) {
     return eatWhitespaceBefore(stream, allocator, state, []const u8, .{ Parser.Char.string, .{symbol} });
 }
 
-inline fn operator2(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, symbol: []const u8, notFollowed: []const u8) anyerror!Result([]const u8) {
+inline fn operator2(stream: Stream, allocator: std.mem.Allocator, state: State, symbol: []const u8, notFollowed: []const u8) anyerror!Result([]const u8) {
     return eatWhitespaceBefore(stream, allocator, state, []const u8, .{
         Parser.Combinator.notFollowedBy, .{
             []const u8,
@@ -62,7 +62,7 @@ inline fn operator2(stream: Stream, allocator: std.mem.Allocator, state: *BaseSt
 // Parse a string representing a operator, if notFollowed is not null check if the operator is followed by the given characters
 // operator("=", "=") can only match "="
 // operator("=", null) can partialy match "=="
-pub fn operator(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, symbol: []const u8, notFollowed: ?[]const u8) anyerror!Result([]const u8) {
+pub fn operator(stream: Stream, allocator: std.mem.Allocator, state: State, symbol: []const u8, notFollowed: ?[]const u8) anyerror!Result([]const u8) {
     if (notFollowed) |followed| {
         return operator2(stream, allocator, state, symbol, followed);
     } else {
@@ -71,7 +71,7 @@ pub fn operator(stream: Stream, allocator: std.mem.Allocator, state: *BaseState,
 }
 
 // Eat all the whitespace before running the given parser
-pub inline fn eatWhitespaceBefore(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime T: type, p: anytype) anyerror!Result(T) {
+pub inline fn eatWhitespaceBefore(stream: Stream, allocator: std.mem.Allocator, state: State, comptime T: type, p: anytype) anyerror!Result(T) {
     return switch (try Parser.Char.spaces(stream, allocator, state)) {
         .Result => |res| runParser(res.rest, allocator, state, T, p),
         .Error => |err| Result(T).failure(err.msg, err.rest),
@@ -79,7 +79,7 @@ pub inline fn eatWhitespaceBefore(stream: Stream, allocator: std.mem.Allocator, 
 }
 
 // Parse a integer given the type
-pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Int: type) anyerror!Result(Int) {
     switch (try Parser.Char.digit(stream, allocator, state)) {
         .Result => |res| {
             var s = res.rest;
@@ -103,7 +103,7 @@ pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, 
 }
 
 // Parse a integer with a hexadecimal representation given the type
-pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Int: type) anyerror!Result(Int) {
     switch (try Parser.Char.hexDigit(stream, allocator, state)) {
         .Result => |res| {
             var s = res.rest;
@@ -127,7 +127,7 @@ pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseStat
 }
 
 // Parse a integer with a octal representation given the type
-pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Int: type) anyerror!Result(Int) {
+pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Int: type) anyerror!Result(Int) {
     switch (try Parser.Char.octDigit(stream, allocator, state)) {
         .Result => |res| {
             var s = res.rest;
@@ -150,7 +150,7 @@ pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: *BaseStat
     }
 }
 
-inline fn floating1(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+inline fn floating1(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result(void) {
     switch (try Parser.Char.digit(stream, allocator, state)) {
         .Result => |res| {
             var s = res.rest;
@@ -172,7 +172,7 @@ inline fn floating1(stream: Stream, allocator: std.mem.Allocator, state: *BaseSt
     }
 }
 
-inline fn floating2(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+inline fn floating2(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result(void) {
     return switch (try Parser.Char.symbol(stream, allocator, state, '.')) {
         .Result => |res| floating1(res.rest, allocator, state),
         .Error => |err| blk: {
@@ -182,7 +182,7 @@ inline fn floating2(stream: Stream, allocator: std.mem.Allocator, state: *BaseSt
     };
 }
 
-inline fn floating3(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result(void) {
+inline fn floating3(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result(void) {
     return switch (try Parser.Char.symbol(stream, allocator, state, 'e')) {
         .Result => |res| switch (try Parser.Char.symbol(res.rest, allocator, state, '-')) {
             .Result => |res1| floating1(res1.rest, allocator, state),
@@ -199,7 +199,7 @@ inline fn floating3(stream: Stream, allocator: std.mem.Allocator, state: *BaseSt
 }
 
 // Parse a floating pointer number given the type
-pub fn floating(stream: Stream, allocator: std.mem.Allocator, state: *BaseState, comptime Float: type) anyerror!Result(Float) {
+pub fn floating(stream: Stream, allocator: std.mem.Allocator, state: State, comptime Float: type) anyerror!Result(Float) {
     switch (try floating1(stream, allocator, state)) {
         .Result => |res| {
             var s = res.rest;
@@ -220,7 +220,7 @@ pub fn floating(stream: Stream, allocator: std.mem.Allocator, state: *BaseState,
 }
 
 // Parse all character between quotes
-pub fn literalString(stream: Stream, allocator: std.mem.Allocator, state: *BaseState) anyerror!Result([]u8) {
+pub fn literalString(stream: Stream, allocator: std.mem.Allocator, state: State) anyerror!Result([]u8) {
     return switch (try Parser.Char.symbol(stream, allocator, state, '"')) {
         .Result => |res| blk: {
             break :blk Parser.Combinator.until(
