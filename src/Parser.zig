@@ -9,7 +9,7 @@ pub const ParseError = @import("Result.zig").ParseError;
 pub const Stream = @import("Stream.zig");
 pub const Char = @import("Char.zig");
 pub const Combinator = @import("Combinator.zig");
-//pub const Language = @import("Language.zig");
+pub const Language = @import("Language.zig");
 pub const Expr = @import("./Expression/Generator.zig");
 
 pub fn pure(stream: Stream, _: std.mem.Allocator, _: State) anyerror!Result(void) {

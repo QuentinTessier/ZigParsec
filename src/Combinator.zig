@@ -82,7 +82,7 @@ pub fn skipMany(stream: Stream, allocator: std.mem.Allocator, state: State, comp
                 s = res.rest;
             },
             .Error => |err| {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break;
             },
         }
@@ -152,7 +152,7 @@ pub fn option(stream: Stream, allocator: std.mem.Allocator, state: State, compti
         .Result => r,
         .Error => |err| blk: {
             if (stream.diff(err.rest).len == 0) {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break :blk Result(Value).success(x, err.rest);
             } else break :blk r;
         },
@@ -183,7 +183,7 @@ pub fn optional(stream: Stream, allocator: std.mem.Allocator, state: State, comp
         .Result => |res| Result(void).success(void{}, res.rest),
         .Error => |err| blk: {
             if (stream.diff(err.rest).len == 0) {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break :blk Result(void).success(void{}, err.rest);
             } else {
                 var local_err: ParseError = .init(stream.currentLocation);
@@ -205,7 +205,7 @@ pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
             s = res.rest;
         },
         .Error => |err| {
-            err.msg.deinit();
+            err.msg.deinit(allocator);
             return Result([]PValue).success(&.{}, err.rest);
         },
     }
@@ -217,7 +217,7 @@ pub fn sepBy(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
                 break :run true;
             },
             .Error => |err| {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break :run false;
             },
         }
@@ -265,7 +265,7 @@ pub fn sepBy1(stream: Stream, allocator: std.mem.Allocator, state: State, compti
                 break :run true;
             },
             .Error => |err| {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break :run false;
             },
         }
@@ -292,9 +292,9 @@ pub fn notFollowedBy(stream: Stream, allocator: std.mem.Allocator, state: State,
     switch (try runParser(stream, allocator, state, PValue, parser)) {
         .Result => |res| {
             switch (try runParser(res.rest, allocator, state, FValue, follow)) {
-                .Result => return Result(PValue).failure(std.ArrayList(u8).init(allocator), res.rest),
+                .Result => return Result(PValue).failure(ParseError.init(res.rest.currentLocation), res.rest), // TODO: Improve message
                 .Error => |err| {
-                    err.msg.deinit();
+                    err.msg.deinit(allocator);
                     return Result(PValue).success(res.value, res.rest);
                 },
             }
@@ -401,7 +401,7 @@ pub fn until(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
                 break :blk false;
             },
             .Error => |err| {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 s = err.rest;
                 break :blk true;
             },

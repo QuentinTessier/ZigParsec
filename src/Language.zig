@@ -28,14 +28,20 @@ pub fn identifier(stream: Stream, allocator: std.mem.Allocator, state: State) an
                         break :blk true;
                     },
                     .Error => |err| {
-                        err.msg.deinit();
+                        err.msg.deinit(allocator);
                         break :blk false;
                     },
                 }
             }) {}
             return Result([]u8).success(try allocator.dupe(u8, stream.diff(s)), s);
         },
-        .Error => |err| return Result([]u8).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "identifier", .{});
+            try local_err.withContext(allocator, "identifier");
+            return Result([]u8).failure(err.msg, err.rest);
+        },
     }
 }
 
@@ -90,7 +96,7 @@ pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: State, compt
                         break :blk true;
                     },
                     .Error => |err| {
-                        err.msg.deinit();
+                        err.msg.deinit(allocator);
                         break :blk false;
                     },
                 }
@@ -98,7 +104,13 @@ pub fn integer(stream: Stream, allocator: std.mem.Allocator, state: State, compt
             const buffer = stream.diff(s);
             return Result(Int).success(try std.fmt.parseInt(Int, buffer, 10), s);
         },
-        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "integer_{s}", .{@typeName(Int)});
+            try local_err.withContext(allocator, "integer");
+            return Result(Int).failure(local_err, err.rest);
+        },
     }
 }
 
@@ -114,7 +126,7 @@ pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: State, co
                         break :blk true;
                     },
                     .Error => |err| {
-                        err.msg.deinit();
+                        err.msg.deinit(allocator);
                         break :blk false;
                     },
                 }
@@ -122,7 +134,13 @@ pub fn hexInteger(stream: Stream, allocator: std.mem.Allocator, state: State, co
             const buffer = stream.diff(s);
             return Result(Int).success(try std.fmt.parseInt(Int, buffer, 16), s);
         },
-        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "hexinteger_{s}", .{@typeName(Int)});
+            try local_err.withContext(allocator, "hexinteger");
+            return Result(Int).failure(local_err, err.rest);
+        },
     }
 }
 
@@ -138,7 +156,7 @@ pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: State, co
                         break :blk true;
                     },
                     .Error => |err| {
-                        err.msg.deinit();
+                        err.msg.deinit(allocator);
                         break :blk false;
                     },
                 }
@@ -146,7 +164,13 @@ pub fn octInteger(stream: Stream, allocator: std.mem.Allocator, state: State, co
             const buffer = stream.diff(s);
             return Result(Int).success(try std.fmt.parseInt(Int, buffer, 8), s);
         },
-        .Error => |err| return Result(Int).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "octinteger_{s}", .{@typeName(Int)});
+            try local_err.withContext(allocator, "hoctinteger");
+            return Result(Int).failure(local_err, err.rest);
+        },
     }
 }
 
@@ -161,7 +185,7 @@ inline fn floating1(stream: Stream, allocator: std.mem.Allocator, state: State) 
                         break :blk true;
                     },
                     .Error => |err| {
-                        err.msg.deinit();
+                        err.msg.deinit(allocator);
                         break :blk false;
                     },
                 }
@@ -176,7 +200,7 @@ inline fn floating2(stream: Stream, allocator: std.mem.Allocator, state: State) 
     return switch (try Parser.Char.symbol(stream, allocator, state, '.')) {
         .Result => |res| floating1(res.rest, allocator, state),
         .Error => |err| blk: {
-            err.msg.deinit();
+            err.msg.deinit(allocator);
             break :blk Result(void).success(void{}, stream);
         },
     };
@@ -187,12 +211,12 @@ inline fn floating3(stream: Stream, allocator: std.mem.Allocator, state: State) 
         .Result => |res| switch (try Parser.Char.symbol(res.rest, allocator, state, '-')) {
             .Result => |res1| floating1(res1.rest, allocator, state),
             .Error => |err| blk: {
-                err.msg.deinit();
+                err.msg.deinit(allocator);
                 break :blk floating1(err.rest, allocator, state);
             },
         },
         .Error => |err| blk: {
-            err.msg.deinit();
+            err.msg.deinit(allocator);
             break :blk Result(void).success(void{}, stream);
         },
     };
@@ -215,7 +239,13 @@ pub fn floating(stream: Stream, allocator: std.mem.Allocator, state: State, comp
             const buffer = stream.diff(s);
             return Result(Float).success(try std.fmt.parseFloat(Float, buffer), s);
         },
-        .Error => |err| return Result(Float).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "floating_{s}", .{@typeName(Float)});
+            try local_err.withContext(allocator, "floating");
+            return Result(Float).failure(local_err, err.rest);
+        },
     }
 }
 
@@ -233,6 +263,12 @@ pub fn literalString(stream: Stream, allocator: std.mem.Allocator, state: State)
                 .{ Parser.Char.symbol, .{'"'} },
             );
         },
-        .Error => |err| Result([]u8).failure(err.msg, err.rest),
+        .Error => |err| {
+            var local_err: Parser.ParseError = .init(stream.currentLocation);
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.expectedPattern(allocator, "lit_string", .{});
+            try local_err.withContext(allocator, "literalString");
+            return Result([]u8).failure(local_err, err.rest);
+        },
     };
 }

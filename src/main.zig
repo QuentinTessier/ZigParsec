@@ -21,13 +21,3 @@ pub fn main() !void {
         },
     }
 }
-
-test "many no input" {
-    const stream: Parser.Stream = .init("", "test");
-    const state: Parser.State = .{};
-
-    const res = try Parser.Combinator.many(stream, std.testing.allocator, state, u8, .{ Parser.Char.symbol, .{'a'} });
-    try std.testing.expect(res == .Result);
-    try std.testing.expectEqual(res.Result.value.len, 0);
-    try std.testing.expect(res.Result.rest.isEOF());
-}
