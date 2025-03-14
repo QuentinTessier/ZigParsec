@@ -50,8 +50,8 @@ pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
         },
         .Error => |err| {
             var local_err: ParseError = .init(stream.currentLocation);
-            try local_err.addChild(allocator, &err);
-            try local_err.message(allocator, "expected at list on {s} found 0", .{@typeName(Value)});
+            try local_err.addChild(allocator, &err.msg);
+            try local_err.message(allocator, "expected a list of {s} found 0", .{@typeName(Value)});
             return Result([]Value).failure(local_err, stream);
         },
     }

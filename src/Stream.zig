@@ -12,6 +12,16 @@ pub const Location = struct {
     }
 };
 
+pub const Range = struct {
+    data: []const u8,
+    start: u64,
+    end: u64,
+
+    pub fn get(self: Range) []const u8 {
+        return self.data[self.start..self.end];
+    }
+};
+
 data: []const u8,
 label: ?[]const u8,
 currentLocation: Location,

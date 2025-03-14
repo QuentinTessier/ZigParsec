@@ -27,6 +27,13 @@ pub fn EitherResultOrError(comptime Value: type, comptime Err: type) type {
                 .Error => |e| return .{ .Error = .{ .msg = e.msg, .rest = e.rest } },
             }
         }
+
+        pub fn stream(self: *const @This()) Stream {
+            return switch (self.*) {
+                .Result => |val| val.rest,
+                .Error => |val| val.rest,
+            };
+        }
     };
 }
 

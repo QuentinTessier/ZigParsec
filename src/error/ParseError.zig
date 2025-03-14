@@ -177,7 +177,7 @@ pub fn message(self: *@This(), allocator: std.mem.Allocator, comptime fmt: []con
 pub fn print(self: *const @This(), stream: Stream, writer: std.io.AnyWriter, showContext: bool) !void {
     try writer.print("{?s}:{}:{}: error: ", .{ stream.label, self.loc.line, self.loc.character });
     if (self.customMessage) |m| {
-        try writer.print("\n{s}\n", .{m});
+        try writer.print("{s}\n", .{m});
     } else {
         try writer.writeByte('\n');
     }

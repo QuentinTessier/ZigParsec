@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const module = b.addModule("ZigParsec", .{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/Parser.zig"),
         .target = target,
         .optimize = optimize,
     });

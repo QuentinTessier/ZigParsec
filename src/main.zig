@@ -14,8 +14,10 @@ pub fn main() !void {
 
     const parser_allocator = arena.allocator();
 
-    const stream: Parser.Stream = .init("(1 + 2) + (3 + 4)", null);
-    const state: Parser.State = .{};
+    const stream: Parser.Stream = .init("1 + 1", null);
+    const state: Parser.State = .{
+        .auto_eat_whitespace = true,
+    };
 
     switch (try ExprParser.expression(stream, parser_allocator, state)) {
         .Error => |err| {
