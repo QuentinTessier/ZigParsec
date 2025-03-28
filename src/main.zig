@@ -1,30 +1,42 @@
 const std = @import("std");
-const Parser = @import("Parser.zig");
+const builtin = @import("builtin");
+const Parser = @import("parser.zig");
 
-const ExprParser = @import("examples/Expression.zig");
+fn TestParser(comptime T: type) type {
+    return Parser.ParserFn(Parser.CharInput, T, Parser.Error);
+}
+
+pub const symbolA = Parser.Prim.Symbol(Parser.CharInput, u8, Parser.Error, 'a');
+pub const symbolB = Parser.Prim.Symbol(Parser.CharInput, u8, Parser.Error, 'b');
+pub const symbolC = Parser.Prim.Symbol(Parser.CharInput, u8, Parser.Error, 'c');
+
+pub const choiceABC = Parser.Combinator.Choice(Parser.CharInput, u8, Parser.Error, &.{
+    symbolA,
+    symbolB,
+    symbolC,
+});
+
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
 pub fn main() !void {
-    var instance: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = instance.deinit();
-
-    const allocator = instance.allocator();
-
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    const parser_allocator = arena.allocator();
-
-    const stream: Parser.Stream = .init("1 + 1", null);
-    const state: Parser.State = .{
-        .auto_eat_whitespace = true,
+    const gpa, const is_debug = gpa: {
+        break :gpa switch (builtin.mode) {
+            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
+            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
+        };
+    };
+    defer if (is_debug) {
+        _ = debug_allocator.deinit();
     };
 
-    switch (try ExprParser.expression(stream, parser_allocator, state)) {
-        .Error => |err| {
-            try err.msg.print(stream, std.io.getStdOut().writer().any(), true);
-        },
-        .Result => |res| {
-            res.value.dump();
-        },
-    }
+    var arena: std.heap.ArenaAllocator = .init(gpa);
+    defer arena.deinit();
+
+    const input: Parser.CharInput = .init("daaab");
+    var err: Parser.Error = undefined;
+    const rest, const value = (try choiceABC(input, arena.allocator())).unwrap(&err) orelse {
+        std.log.err("Error", .{});
+        return;
+    };
+    std.log.info("{c} : {s}", .{ value, rest.data });
 }
