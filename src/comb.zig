@@ -91,3 +91,25 @@ pub fn SepBy(comptime I: type, comptime E: type, comptime P: anytype, comptime S
         }
     }.sepBy;
 }
+
+pub fn Between(comptime I: type, comptime E: type, comptime Open: anytype, comptime Value: anytype, comptime Close: anytype) Parser.ParserFn(I, Parser.ParsedType(@TypeOf(Value)), E) {
+    return struct {
+        const T: type = Parser.ParsedType(@TypeOf(Value));
+        const R = Parser.Result(I, T, E);
+
+        pub fn between(input: I, allocator: std.mem.Allocator) anyerror!R {
+            var err: E = undefined;
+            const input1, _ = (try Open(input, allocator)).unwrap(&err) orelse {
+                return R{ .err = err };
+            };
+            const input2, const value = (try Value(input1, allocator)).unwrap(&err) orelse {
+                return R{ .err = err };
+            };
+            const input3, _ = (try Close(input2, allocator)).unwrap(&err) orelse {
+                return R{ .err = err };
+            };
+
+            return R{ .res = .{ input3, value } };
+        }
+    }.between;
+}
