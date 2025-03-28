@@ -1,3 +1,8 @@
 const std = @import("std");
 
-pub const Error = void;
+pub fn Error(comptime I: type) type {
+    return struct {
+        I,
+        std.builtin.SourceLocation,
+    };
+}
