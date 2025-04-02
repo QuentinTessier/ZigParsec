@@ -1,18 +1,15 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Parser = @import("parser.zig");
+const Ascii = @import("ascii.zig");
 
-pub const symbolA = Parser.Prim.Symbol([]const u8, Parser.Error([]const u8), @as(u8, 'a'));
-pub const symbolB = Parser.Prim.Symbol([]const u8, Parser.Error([]const u8), @as(u8, 'b'));
-pub const betweenB = Parser.Combinator.Between([]const u8, Parser.Error([]const u8), symbolB, symbolA, symbolB);
+const Char = Parser.Prim.Char([]const u8, Parser.Error([]const u8));
+const Comb = Parser.Combinator.Comb([]const u8, Parser.Error([]const u8));
+
+pub const parserIf = Ascii.String("if");
+pub const Base64 = Ascii.Digit(64);
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-
-pub fn Many1(comptime _: type, comptime _: type, comptime P: anytype) type {
-    return struct {
-        pub const T: type = Parser.ParsedType(@TypeOf(P));
-    };
-}
 
 pub const Location = struct {
     line: usize,
@@ -36,6 +33,32 @@ pub fn getLocation(fullSource: []const u8, at: []const u8) Location {
     };
 }
 
+const data =
+    \\{
+    \\      "name": "Title",
+    \\      "value": "Name",
+    \\      "posX": 20
+    \\}
+;
+
+pub const Data = struct {
+    name: []const u8,
+    value: []const u8,
+    posX: u32,
+};
+
+pub const U = union(enum) {
+    a: i32,
+    b: i32,
+};
+
+pub fn isSameActiveTag(a: anytype, b: @TypeOf(a)) bool {
+    const T = @TypeOf(a);
+    comptime std.debug.assert(@typeInfo(T) == .@"union" and @typeInfo(T).@"union".tag_type != null);
+
+    return std.meta.activeTag(a) == std.meta.activeTag(b);
+}
+
 pub fn main() !void {
     const gpa, const is_debug = gpa: {
         break :gpa switch (builtin.mode) {
@@ -50,12 +73,15 @@ pub fn main() !void {
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
 
-    const input = "bababababa";
-    var err: Parser.Error([]const u8) = undefined;
-    const rest, const value = (try betweenB(input, arena.allocator())).unwrap(&err) orelse {
-        std.log.err("Error : {s} : {any}", .{ err.@"1".fn_name, getLocation(input, err.@"0") });
-        return;
-    };
+    // const input = "";
+    // var err: Ascii.AsciiError = undefined;
+    // const rest, const value = (try parserIf(input, arena.allocator())).unwrap(&err) orelse {
+    //     std.log.err("Error : {any} : {any}", .{ getLocation(input, err.input), err.err });
+    //     return;
+    // };
 
-    std.log.info("{c} : {s}", .{ value, rest });
+    // std.log.info("{c} : {s}", .{ value, rest });
+    const a: Data = undefined;
+    const b: Data = undefined;
+    std.log.info("{}", .{isSameActiveTag(a, b)});
 }
