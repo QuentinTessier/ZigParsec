@@ -150,5 +150,19 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 }
             }.between;
         }
+
+        pub fn Option(comptime P: anytype) Parser.ParserFn(I, ?Parser.ParsedType(@TypeOf(P)), E) {
+            return struct {
+                const T: type = Parser.ParsedType(@TypeOf(P));
+                const R = Parser.Result(I, ?T, E);
+
+                pub inline fn option(input: I, allocator: std.mem.Allocator) anyerror!R {
+                    return switch (try P(input, allocator)) {
+                        .res => |r| R{ .res = .{ r[0], r[1] } },
+                        .err => R{ .res = .{ input, null } },
+                    };
+                }
+            }.option;
+        }
     };
 }

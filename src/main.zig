@@ -8,6 +8,7 @@ const Comb = Parser.Combinator.Comb([]const u8, Parser.Error([]const u8));
 
 pub const parserIf = Ascii.String("if");
 pub const Base64 = Ascii.Digit(64);
+pub const OptionIf = Comb.Option(parserIf);
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
@@ -47,11 +48,11 @@ pub fn main() !void {
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
 
-    const input = "";
+    const input = "if";
     var err: Parser.Error([]const u8) = undefined;
-    _, const value = (try parserIf(input, arena.allocator())).unwrap(&err) orelse {
+    _, const value = (try OptionIf(input, arena.allocator())).unwrap(&err) orelse {
         std.log.err("Error : {any} : {any}", .{ getLocation(input, err.input), err });
         return;
     };
-    std.log.info("{s}", .{value});
+    std.log.info("{?s}", .{value});
 }

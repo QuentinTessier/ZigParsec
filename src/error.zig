@@ -14,6 +14,7 @@ pub const ErrKind = enum {
     BetweenOpen,
     BetweenValue,
     BetweenClose,
+    Option,
 };
 
 // Any error type should be built following this type definition
