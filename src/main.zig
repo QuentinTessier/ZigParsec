@@ -33,32 +33,6 @@ pub fn getLocation(fullSource: []const u8, at: []const u8) Location {
     };
 }
 
-const data =
-    \\{
-    \\      "name": "Title",
-    \\      "value": "Name",
-    \\      "posX": 20
-    \\}
-;
-
-pub const Data = struct {
-    name: []const u8,
-    value: []const u8,
-    posX: u32,
-};
-
-pub const U = union(enum) {
-    a: i32,
-    b: i32,
-};
-
-pub fn isSameActiveTag(a: anytype, b: @TypeOf(a)) bool {
-    const T = @TypeOf(a);
-    comptime std.debug.assert(@typeInfo(T) == .@"union" and @typeInfo(T).@"union".tag_type != null);
-
-    return std.meta.activeTag(a) == std.meta.activeTag(b);
-}
-
 pub fn main() !void {
     const gpa, const is_debug = gpa: {
         break :gpa switch (builtin.mode) {
@@ -79,9 +53,4 @@ pub fn main() !void {
     //     std.log.err("Error : {any} : {any}", .{ getLocation(input, err.input), err.err });
     //     return;
     // };
-
-    // std.log.info("{c} : {s}", .{ value, rest });
-    const a: Data = undefined;
-    const b: Data = undefined;
-    std.log.info("{}", .{isSameActiveTag(a, b)});
 }
