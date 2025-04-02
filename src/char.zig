@@ -6,7 +6,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
         pub fn Symbol(comptime s: anytype) Parser.ParserFn(I, @TypeOf(s), E) {
             return struct {
                 const R = Parser.Result(I, @TypeOf(s), E);
-                pub fn symbol(input: I, _: std.mem.Allocator) anyerror!R {
+                pub inline fn symbol(input: I, _: std.mem.Allocator) anyerror!R {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }
@@ -24,7 +24,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
             return struct {
                 const T = std.meta.Child(I);
                 const R = Parser.Result(I, T, E);
-                pub fn any(input: I, _: std.mem.Allocator) anyerror!Parser.Result(I, T, E) {
+                pub inline fn any(input: I, _: std.mem.Allocator) anyerror!Parser.Result(I, T, E) {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }
@@ -37,7 +37,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
         pub fn AnyOf(comptime Values: anytype) Parser.ParserFn(I, Parser.ParsedType(@TypeOf(Values[0])), E) {
             return struct {
                 const R = Parser.Result(I, Parser.ParsedType(@TypeOf(Values[0])), E);
-                pub fn anyOf(input: I, _: std.mem.Allocator) anyerror!R {
+                pub inline fn anyOf(input: I, _: std.mem.Allocator) anyerror!R {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }
@@ -56,7 +56,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
         pub fn NoneOf(comptime Values: anytype) Parser.ParserFn(I, Parser.ParsedType(@TypeOf(Values[0])), E) {
             return struct {
                 const R = Parser.Result(I, Parser.ParsedType(@TypeOf(Values[0])), E);
-                pub fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
+                pub inline fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }
@@ -76,7 +76,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
             std.debug.assert(Values[0] < Values[1]);
             return struct {
                 const R = Parser.Result(I, @TypeOf(Values[0]), E);
-                pub fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
+                pub inline fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }
@@ -94,7 +94,7 @@ pub fn Char(comptime I: type, comptime E: type) type {
         pub fn Satisfy(comptime T: type, comptime P: fn (T) bool) Parser.ParserFn(I, T, E) {
             return struct {
                 const R = Parser.Result(I, T, E);
-                pub fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
+                pub inline fn noneOf(input: I, _: std.mem.Allocator) anyerror!R {
                     if (input.len == 0) {
                         return R{ .err = .{ input, @src() } };
                     }

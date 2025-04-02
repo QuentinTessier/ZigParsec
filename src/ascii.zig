@@ -16,7 +16,7 @@ pub fn AsciiResult(comptime T: type, comptime E: type) type {
 pub fn Satisfy(comptime Pred: fn (u8) bool) AsciiParserFn(u8) {
     return struct {
         const R = AsciiResult(u8, AsciiError);
-        pub fn satisfy(input: []const u8, _: std.mem.Allocator) anyerror!R {
+        pub inline fn satisfy(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
                 return R{ .err = .fromKind(input, .Satisfy) };
             }
@@ -33,7 +33,7 @@ pub fn Satisfy(comptime Pred: fn (u8) bool) AsciiParserFn(u8) {
 pub fn Char(comptime C: u8) AsciiParserFn(u8) {
     return struct {
         const R = AsciiResult(u8, AsciiError);
-        pub fn char(input: []const u8, _: std.mem.Allocator) anyerror!R {
+        pub inline fn char(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
                 return R{ .err = .fromKind(input, .Char) };
             }
@@ -50,7 +50,7 @@ pub fn Char(comptime C: u8) AsciiParserFn(u8) {
 pub fn String(comptime Str: []const u8) AsciiParserFn([]const u8) {
     return struct {
         const R = AsciiResult([]const u8, AsciiError);
-        pub fn string(input: []const u8, _: std.mem.Allocator) anyerror!R {
+        pub inline fn string(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
                 return R{ .err = .fromKind(input, .String) };
             }
@@ -67,7 +67,7 @@ pub fn String(comptime Str: []const u8) AsciiParserFn([]const u8) {
 pub fn AnyOf(comptime Chars: []const u8) AsciiParserFn(u8) {
     return struct {
         const R = AsciiResult(u8, AsciiError);
-        pub fn anyOf(input: []const u8, _: std.mem.Allocator) anyerror!R {
+        pub inline fn anyOf(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
                 return R{ .err = .fromKind(input, .AnyOf) };
             }
@@ -105,7 +105,7 @@ pub fn NoneOf(comptime Chars: []const u8) AsciiParserFn(u8) {
 pub fn Range(comptime Start: u8, comptime End: u8) AsciiParserFn(u8) {
     return struct {
         const R = AsciiResult(u8, AsciiError);
-        pub fn range(input: []const u8, _: std.mem.Allocator) anyerror!R {
+        pub inline fn range(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
                 return R{ .err = .fromKind(input, .Range) };
             }
@@ -118,14 +118,14 @@ pub fn Range(comptime Start: u8, comptime End: u8) AsciiParserFn(u8) {
     }.range;
 }
 
-pub fn isOct(c: u8) bool {
+pub inline fn isOct(c: u8) bool {
     return switch (c) {
         '0'...'7' => true,
         else => false,
     };
 }
 
-pub fn isDigitBase(comptime base: u8) bool {
+pub inline fn isDigitBase(comptime base: u8) bool {
     return struct {
         pub fn isDigit(c: u8) bool {
             const range_end = '0' + (base - 1);

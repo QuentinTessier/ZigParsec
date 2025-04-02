@@ -3,11 +3,28 @@ const Parser = @import("parser.zig");
 
 pub fn Comb(comptime I: type, comptime E: type) type {
     return struct {
+        pub fn Count(comptime P: anytype) Parser.ParserFn(I, u64, E) {
+            return struct {
+                const R = Parser.Result(I, u64, E);
+                pub inline fn count(input: I, allocator: std.mem.Allocator) anyerror!R {
+                    var i = input;
+                    var counter: u64 = 0;
+                    var err: E = undefined;
+                    while ((try P(i, allocator)).unwrap(&err)) |result| {
+                        counter += 1;
+                        i = result.@"0";
+                    }
+
+                    return R{ .res = .{ i, counter } };
+                }
+            }.count;
+        }
+
         pub fn Many(comptime P: anytype) Parser.ParserFn(I, []Parser.ParsedType(@TypeOf(P)), E) {
             return struct {
                 const T: type = Parser.ParsedType(@TypeOf(P));
                 const R = Parser.Result(I, []T, E);
-                pub fn many(input: I, allocator: std.mem.Allocator) anyerror!R {
+                pub inline fn many(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var i = input;
                     var array: std.ArrayList(T) = .init(allocator);
                     errdefer array.deinit();
@@ -27,7 +44,7 @@ pub fn Comb(comptime I: type, comptime E: type) type {
             return struct {
                 const T: type = Parser.ParsedType(@TypeOf(P));
                 const R = Parser.Result(I, []T, E);
-                pub fn many1(input: I, allocator: std.mem.Allocator) anyerror!R {
+                pub inline fn many1(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var array: std.ArrayList(T) = .init(allocator);
                     errdefer array.deinit();
 
@@ -50,7 +67,7 @@ pub fn Comb(comptime I: type, comptime E: type) type {
             return struct {
                 const T: type = Parser.ParsedType(@TypeOf(P[0]));
                 const R = Parser.Result(I, T, E);
-                pub fn choice(input: I, allocator: std.mem.Allocator) anyerror!R {
+                pub inline fn choice(input: I, allocator: std.mem.Allocator) anyerror!R {
                     for (P) |parser| {
                         switch (try parser(input, allocator)) {
                             .res => |res| return R{ .res = res },
@@ -74,7 +91,7 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 const T: type = Parser.ParsedType(@TypeOf(P));
                 const R = Parser.Result(I, []T, E);
 
-                pub fn sepBy(input: I, allocator: std.mem.Allocator) anyerror!R {
+                pub inline fn sepBy(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var array: std.ArrayList(T) = .init(allocator);
                     errdefer array.deinit();
 
@@ -117,16 +134,16 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 const T: type = Parser.ParsedType(@TypeOf(Value));
                 const R = Parser.Result(I, T, E);
 
-                pub fn between(input: I, allocator: std.mem.Allocator) anyerror!R {
+                pub inline fn between(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var err: E = undefined;
                     const input1, _ = (try Open(input, allocator)).unwrap(&err) orelse {
-                        return R{ .err = .fromKind(input, .Between) };
+                        return R{ .err = .fromKind(input, .BetweenOpen) };
                     };
                     const input2, const value = (try Value(input1, allocator)).unwrap(&err) orelse {
-                        return R{ .err = .fromKind(input, .Between) };
+                        return R{ .err = .fromKind(input, .BetweenValue) };
                     };
                     const input3, _ = (try Close(input2, allocator)).unwrap(&err) orelse {
-                        return R{ .err = .fromKind(input, .Between) };
+                        return R{ .err = .fromKind(input, .BetweenClose) };
                     };
 
                     return R{ .res = .{ input3, value } };

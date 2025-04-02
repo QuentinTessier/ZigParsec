@@ -11,7 +11,9 @@ pub const ErrKind = enum {
     Many1,
     Choice,
     SepBy,
-    Between,
+    BetweenOpen,
+    BetweenValue,
+    BetweenClose,
 };
 
 // Any error type should be built following this type definition
