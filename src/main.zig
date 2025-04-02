@@ -47,10 +47,11 @@ pub fn main() !void {
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
 
-    // const input = "";
-    // var err: Ascii.AsciiError = undefined;
-    // const rest, const value = (try parserIf(input, arena.allocator())).unwrap(&err) orelse {
-    //     std.log.err("Error : {any} : {any}", .{ getLocation(input, err.input), err.err });
-    //     return;
-    // };
+    const input = "";
+    var err: Parser.Error([]const u8) = undefined;
+    _, const value = (try parserIf(input, arena.allocator())).unwrap(&err) orelse {
+        std.log.err("Error : {any} : {any}", .{ getLocation(input, err.input), err });
+        return;
+    };
+    std.log.info("{s}", .{value});
 }

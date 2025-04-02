@@ -3,21 +3,10 @@ const Parser = @import("parser.zig");
 const Result = Parser.Result;
 const ParserFn = Parser.ParserFn;
 
-pub const AsciiError = struct {
-    input: []const u8,
-    err: union(enum) {
-        satisfy: void,
-        expected_any_of: []const u8,
-        expected_none_of: []const u8,
-        expected_range: [2]u8,
-        expected_char: u8,
-        expected_str: []const u8,
-        eof: void,
-    },
-};
+pub const AsciiError = Parser.Error([]const u8);
 
 pub fn AsciiParserFn(comptime T: type) type {
-    return ParserFn([]const u8, T, AsciiError);
+    return ParserFn([]const u8, T, Parser.Error([]const u8));
 }
 
 pub fn AsciiResult(comptime T: type, comptime E: type) type {
@@ -29,17 +18,11 @@ pub fn Satisfy(comptime Pred: fn (u8) bool) AsciiParserFn(u8) {
         const R = AsciiResult(u8, AsciiError);
         pub fn satisfy(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .Satisfy) };
             }
 
             if (!Pred(input[0])) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .satisfy = void{} },
-                } };
+                return R{ .err = .fromKind(input, .Satisfy) };
             }
 
             return R{ .res = .{ input[1..], input[0] } };
@@ -52,17 +35,11 @@ pub fn Char(comptime C: u8) AsciiParserFn(u8) {
         const R = AsciiResult(u8, AsciiError);
         pub fn char(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .Char) };
             }
 
             if (input[0] != C) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .expected_char = C },
-                } };
+                return R{ .err = .fromKind(input, .Char) };
             }
 
             return R{ .res = .{ input[1..], C } };
@@ -75,17 +52,11 @@ pub fn String(comptime Str: []const u8) AsciiParserFn([]const u8) {
         const R = AsciiResult([]const u8, AsciiError);
         pub fn string(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .String) };
             }
 
             if (!std.mem.startsWith(u8, input, Str)) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .expected_str = Str },
-                } };
+                return R{ .err = .fromKind(input, .String) };
             }
 
             return R{ .res = .{ input[Str.len..], input[0..Str.len] } };
@@ -98,10 +69,7 @@ pub fn AnyOf(comptime Chars: []const u8) AsciiParserFn(u8) {
         const R = AsciiResult(u8, AsciiError);
         pub fn anyOf(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .AnyOf) };
             }
 
             inline for (Chars) |c| {
@@ -110,10 +78,7 @@ pub fn AnyOf(comptime Chars: []const u8) AsciiParserFn(u8) {
                 }
             }
 
-            return R{ .err = .{
-                .input = input,
-                .err = .{ .expected_any_of = Chars },
-            } };
+            return R{ .err = .fromKind(input, .AnyOf) };
         }
     }.anyOf;
 }
@@ -123,18 +88,12 @@ pub fn NoneOf(comptime Chars: []const u8) AsciiParserFn(u8) {
         const R = AsciiResult(u8, AsciiError);
         pub fn noneOf(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .NoneOf) };
             }
 
             inline for (Chars) |c| {
                 if (input[0] == c) {
-                    return R{ .err = .{
-                        .input = input,
-                        .err = .{ .expected_none_of = Chars },
-                    } };
+                    return R{ .err = .fromKind(input, .NoneOf) };
                 }
             }
 
@@ -148,18 +107,12 @@ pub fn Range(comptime Start: u8, comptime End: u8) AsciiParserFn(u8) {
         const R = AsciiResult(u8, AsciiError);
         pub fn range(input: []const u8, _: std.mem.Allocator) anyerror!R {
             if (input.len == 0) {
-                return R{ .err = .{
-                    .input = input,
-                    .err = .{ .eof = void{} },
-                } };
+                return R{ .err = .fromKind(input, .Range) };
             }
 
             return switch (input[0]) {
                 Start...End => R{ .res = .{ input[1..], input[0] } },
-                else => R{ .err = .{
-                    .input = input,
-                    .err = .{ .expected_range = .{ Start, End } },
-                } },
+                else => R{ .err = .fromKind(input, .Range) },
             };
         }
     }.range;

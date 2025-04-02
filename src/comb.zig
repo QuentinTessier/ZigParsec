@@ -10,6 +10,8 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 pub fn many(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var i = input;
                     var array: std.ArrayList(T) = .init(allocator);
+                    errdefer array.deinit();
+
                     var err: E = undefined;
                     while ((try P(i, allocator)).unwrap(&err)) |result| {
                         try array.append(result.@"1");
@@ -27,9 +29,11 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 const R = Parser.Result(I, []T, E);
                 pub fn many1(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var array: std.ArrayList(T) = .init(allocator);
+                    errdefer array.deinit();
+
                     var err: E = undefined;
                     var i, const value = (try P(input, allocator)).unwrap(&err) orelse {
-                        return R{ .err = .{ input, @src() } };
+                        return R{ .err = .fromKind(input, .Many1) };
                     };
                     try array.append(value);
                     while ((try P(i, allocator)).unwrap(&err)) |result| {
@@ -53,7 +57,7 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                             .err => {},
                         }
                     }
-                    return R{ .err = .{ input, @src() } };
+                    return R{ .err = .fromKind(input, .Choice) };
                 }
             }.choice;
         }
@@ -72,6 +76,8 @@ pub fn Comb(comptime I: type, comptime E: type) type {
 
                 pub fn sepBy(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var array: std.ArrayList(T) = .init(allocator);
+                    errdefer array.deinit();
+
                     var i = input;
                     state: switch (SepByStateMachine.first_value) {
                         .first_value => switch (try P(i, allocator)) {
@@ -90,7 +96,7 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                             },
                             .err => {
                                 array.deinit();
-                                return R{ .err = .{ i, @src() } };
+                                return R{ .err = .fromKind(input, .SepBy) };
                             },
                         },
                         .sep => switch (try Sep(i, allocator)) {
@@ -114,13 +120,13 @@ pub fn Comb(comptime I: type, comptime E: type) type {
                 pub fn between(input: I, allocator: std.mem.Allocator) anyerror!R {
                     var err: E = undefined;
                     const input1, _ = (try Open(input, allocator)).unwrap(&err) orelse {
-                        return R{ .err = err };
+                        return R{ .err = .fromKind(input, .Between) };
                     };
                     const input2, const value = (try Value(input1, allocator)).unwrap(&err) orelse {
-                        return R{ .err = err };
+                        return R{ .err = .fromKind(input, .Between) };
                     };
                     const input3, _ = (try Close(input2, allocator)).unwrap(&err) orelse {
-                        return R{ .err = err };
+                        return R{ .err = .fromKind(input, .Between) };
                     };
 
                     return R{ .res = .{ input3, value } };
