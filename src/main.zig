@@ -1,6 +1,7 @@
 const std = @import("std");
 const ParseError = @import("error/Error.zig").ParseError;
 
+// TODO: Improved return type to make it aware of backtracking result, add safe and unsafe function to unwrap value out of the Result type
 pub fn Result(comptime Stream: type, comptime Value: type, comptime Err: type) type {
     return union(enum(u32)) {
         Result: struct {
@@ -36,6 +37,7 @@ pub fn Result(comptime Stream: type, comptime Value: type, comptime Err: type) t
     };
 }
 
+// TODO: Use the zig's 0.16.0 Reader interface instead of a custom type. This mean figuring out how to get a "checkpoint" output of a reader.
 pub fn ParserStream(comptime S: type) type {
     return struct {
         data: S,
@@ -302,6 +304,8 @@ pub fn main() !void {
     const parser_allocator = arena.allocator();
 
     const stream: ParserStream([]const u8) = .init("b");
+
+    // TODO: Provide a `parse` function that handles the creation of the arena
     switch (try alt_a_b(stream, parser_allocator)) {
         .Result => |r| {
             std.log.debug("Success: {any}", .{r});
