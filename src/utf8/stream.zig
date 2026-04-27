@@ -17,7 +17,7 @@ pub fn is_partial(self: *const Stream) bool {
     return self.reader != null;
 }
 
-pub fn fixed(allocator: std.mem.Allocator, bytes: *std.array_list.Aligned(u8, .{})) Stream {
+pub fn fixed(allocator: std.mem.Allocator, bytes: *std.array_list.Aligned(u8, null)) Stream {
     return .{
         .allocator = allocator,
         .bytes = bytes,

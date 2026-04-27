@@ -16,7 +16,7 @@ pub fn Result(comptime S: type, comptime V: type, comptime E: type) type {
         }
 
         pub fn failure(value: E, rest: S) @This() {
-            return .{ .@"error" = .{ .e = value, .rest = rest } };
+            return .{ .@"error" = .{ .value = value, .rest = rest } };
         }
 
         pub fn stream(self: *const @This()) S {
