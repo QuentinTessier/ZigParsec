@@ -37,33 +37,93 @@ pub fn Result(comptime Stream: type, comptime Value: type, comptime Err: type) t
     };
 }
 
-// TODO: Use the zig's 0.16.0 Reader interface instead of a custom type. This mean figuring out how to get a "checkpoint" output of a reader.
-pub fn ParserStream(comptime S: type) type {
-    return struct {
-        data: S,
-        total_size: usize,
+pub const Checkpoint = enum(usize) {
+    begin = 0,
+    end = std.math.maxInt(usize),
+    _,
+};
 
-        pub fn init(data: S) @This() {
-            return .{
-                .data = data,
-                .total_size = data.len,
-            };
+pub const Utf8ReaderStream = struct {
+    reader: ?*std.Io.Reader = null,
+    allocator: std.mem.Allocator,
+    bytes: *std.array_list.Aligned(u8, null),
+    offset: usize,
+
+    pub fn is_partial(self: *const Utf8ReaderStream) ?*std.Io.Reader {
+        return self.reader;
+    }
+
+    pub fn init_fixed(allocator: std.mem.Allocator, bytes: *std.array_list.Aligned(u8, null)) Utf8ReaderStream {
+        return .{
+            .allocator = allocator,
+            .bytes = bytes,
+            .offset = 0,
+        };
+    }
+
+    pub fn init_partial(allocator: std.mem.Allocator, reader: *std.Io.Reader, bytes: *std.array_list.Aligned(u8, null)) Utf8ReaderStream {
+        return .{
+            .allocator = allocator,
+            .reader = reader,
+            .bytes = bytes,
+            .offset = 0,
+        };
+    }
+
+    pub fn peek(self: *const Utf8ReaderStream) std.Io.Reader.AppendExactError!u8 {
+        if (self.offset < self.bytes.items.len) {
+            return self.bytes.items[self.offset];
         }
 
-        pub fn consume(self: *const @This(), n: usize) @This() {
-            return .{
-                .data = self.data[n..],
-                .total_size = self.total_size,
-            };
+        if (self.reader) |reader| {
+            try reader.appendExact(self.allocator, self.bytes, 1);
+            return self.bytes.items[self.offset];
+        }
+        return error.EndOfStream;
+    }
+
+    pub fn peek_slice(self: *const Utf8ReaderStream, n: usize) ![]const u8 {
+        const available = self.bytes.items.len -| self.offset;
+        if (available >= n) {
+            return self.bytes.items[self.offset .. self.offset + n];
         }
 
-        pub fn checkpoint(self: *const @This()) usize {
-            return self.total_size - self.data.len;
+        if (self.reader) |reader| {
+            const needed = n - available;
+            try reader.appendExact(self.allocator, self.bytes, needed);
+            return self.bytes.items[self.offset .. self.offset + n];
         }
-    };
-}
+        return self.bytes.items[self.offset .. self.offset + available];
+    }
 
-pub const Utf8Error = ParseError(ParserStream([]const u8), usize, u8);
+    pub fn consume(self: *const Utf8ReaderStream, n: usize) Utf8ReaderStream {
+        return .{
+            .reader = self.reader,
+            .bytes = self.bytes,
+            .offset = self.offset + n,
+            .allocator = self.allocator,
+        };
+    }
+
+    pub fn checkpoint(self: *const Utf8ReaderStream) Checkpoint {
+        return @enumFromInt(self.offset);
+    }
+
+    pub fn backtrack(self: *const Utf8ReaderStream, c: Checkpoint) Utf8ReaderStream {
+        return .{
+            .reader = self.reader,
+            .bytes = self.bytes,
+            .offset = switch (c) {
+                .begin => 0,
+                .end => self.bytes.items.len - 1,
+                else => @intFromEnum(c),
+            },
+            .allocator = self.allocator,
+        };
+    }
+};
+
+pub const Utf8Error = ParseError(Utf8ReaderStream, Checkpoint, u8);
 
 pub fn Error(comptime E: type) type {
     return union(enum) {
@@ -77,28 +137,33 @@ pub fn Parser(comptime S: type, comptime V: type, comptime E: type) type {
 }
 
 pub fn ParserUtf8(comptime V: type) type {
-    return Parser(ParserStream([]const u8), V, Utf8Error);
+    return Parser(Utf8ReaderStream, V, Utf8Error);
 }
 
 pub fn Utf8Atom(comptime C: u8) ParserUtf8(u8) {
     return struct {
-        const R = Result(ParserStream([]const u8), u8, Error(Utf8Error));
+        const R = Result(Utf8ReaderStream, u8, Error(Utf8Error));
 
-        pub fn inline_parser(stream: ParserStream([]const u8), allocator: std.mem.Allocator) anyerror!R {
+        pub fn inline_parser(stream: Utf8ReaderStream, allocator: std.mem.Allocator) anyerror!R {
+            var s = stream;
             const checkpoint = stream.checkpoint();
-            if (stream.data.len == 0) {
-                var err: Utf8Error = .empty;
-                _ = err.end_of_input().append(stream, checkpoint);
-                return R.failure(.{ .backtrack = err }, stream);
-            } else if (stream.data[0] == C) {
+            const byte = s.peek() catch |e| switch (e) {
+                error.EndOfStream => {
+                    var err: Utf8Error = .empty;
+                    _ = err.end_of_input().append(stream, checkpoint);
+                    return R.failure(.{ .backtrack = err }, stream);
+                },
+                else => return e,
+            };
+            if (byte == C) {
                 return R.success(C, stream.consume(1));
             } else {
                 var err: Utf8Error = .empty;
                 _ = err
-                    .unexpected(.{ .unexpected_token = stream.data[0] })
+                    .unexpected(.{ .unexpected_token = byte })
                     .expected(allocator, .{ .expected_token = C })
-                    .append(stream.consume(1), checkpoint);
-                return R.failure(.{ .backtrack = err }, stream.consume(1));
+                    .append(s.consume(1), checkpoint);
+                return R.failure(.{ .backtrack = err }, stream);
             }
         }
     }.inline_parser;
@@ -106,29 +171,37 @@ pub fn Utf8Atom(comptime C: u8) ParserUtf8(u8) {
 
 pub fn Utf8String(comptime S: []const u8) ParserUtf8([]const u8) {
     return struct {
-        const R = Result(ParserStream([]const u8), []const u8, Error(Utf8Error));
+        const R = Result(Utf8ReaderStream, []const u8, Error(Utf8Error));
 
-        pub fn inline_parser(stream: ParserStream([]const u8), allocator: std.mem.Allocator) anyerror!R {
+        pub fn inline_parser(stream: Utf8ReaderStream, allocator: std.mem.Allocator) anyerror!R {
             const checkpoint = stream.checkpoint();
-            if (stream.data.len == 0) {
-                var err: Utf8Error = .empty;
-                _ = err.end_of_input().append(stream, checkpoint);
-                return R.failure(.{ .backtrack = err }, stream);
-            } else if (stream.data.len < S.len) {
+            var s = stream;
+
+            const bytes = s.peek_slice(S.len) catch |e| switch (e) {
+                error.EndOfStream => {
+                    std.log.err("Shouldn't enter here", .{});
+                    var err: Utf8Error = .empty;
+                    _ = err.end_of_input().append(stream, checkpoint);
+                    return R.failure(.{ .backtrack = err }, stream);
+                },
+                else => return e,
+            };
+
+            if (bytes.len < S.len) {
                 var err: Utf8Error = .empty;
                 _ = err
-                    .unexpected(.{ .unexpected_range = stream.data[0..] })
+                    .unexpected(.{ .unexpected_range = bytes })
                     .expected(allocator, .{ .expected_range = S })
-                    .append(stream.consume(stream.data.len), checkpoint);
-                return R.failure(.{ .backtrack = err }, stream.consume(stream.data.len));
-            } else if (std.mem.eql(u8, stream.data[0..S.len], S)) {
+                    .append(stream.consume(bytes.len), checkpoint);
+                return R.failure(.{ .backtrack = err }, stream);
+            } else if (std.mem.eql(u8, bytes, S)) {
                 return R.success(S, stream.consume(S.len));
             } else {
                 var err: Utf8Error = .empty;
                 _ = err
-                    .unexpected(.{ .unexpected_range = stream.data[0..S.len] })
+                    .unexpected(.{ .unexpected_range = bytes })
                     .expected(allocator, .{ .expected_range = S })
-                    .append(stream.consume(1), checkpoint);
+                    .append(stream.consume(bytes.len), checkpoint);
                 return R.failure(.{ .backtrack = err }, stream.consume(S.len));
             }
         }
@@ -136,44 +209,44 @@ pub fn Utf8String(comptime S: []const u8) ParserUtf8([]const u8) {
 }
 
 pub const a = Utf8Atom('a');
-pub const b = Utf8Atom('b');
+// pub const b = Utf8Atom('b');
 pub const string = Utf8String("string");
 
-pub fn Alt(comptime S: type, comptime V: type, comptime E: type, comptime Parsers: []const Parser(S, V, E)) Parser(S, V, E) {
-    return struct {
-        const R = Result(S, V, Error(E));
+// pub fn Alt(comptime S: type, comptime V: type, comptime E: type, comptime Parsers: []const Parser(S, V, E)) Parser(S, V, E) {
+//     return struct {
+//         const R = Result(S, V, Error(E));
 
-        pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
-            const checkpoint = stream.checkpoint();
+//         pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
+//             const checkpoint = stream.checkpoint();
 
-            var last_err: ?E = .empty;
+//             var last_err: ?E = .empty;
 
-            inline for (Parsers) |parser| {
-                const result = try parser(stream, allocator);
-                switch (result) {
-                    .Result => return result,
-                    .Error => |e| switch (e.msg) {
-                        .fatal => return result,
-                        .backtrack => |inner| {
-                            if (last_err != null) {
-                                _ = last_err.?.@"or"(allocator, &inner);
-                            } else {
-                                last_err = inner;
-                            }
-                        },
-                    },
-                }
-            }
+//             inline for (Parsers) |parser| {
+//                 const result = try parser(stream, allocator);
+//                 switch (result) {
+//                     .Result => return result,
+//                     .Error => |e| switch (e.msg) {
+//                         .fatal => return result,
+//                         .backtrack => |inner| {
+//                             if (last_err != null) {
+//                                 _ = last_err.?.@"or"(allocator, &inner);
+//                             } else {
+//                                 last_err = inner;
+//                             }
+//                         },
+//                     },
+//                 }
+//             }
 
-            _ = last_err.?.append(stream, checkpoint);
-            return R.failure(.{
-                .backtrack = last_err.?,
-            }, stream);
-        }
-    }.inline_parser;
-}
+//             _ = last_err.?.append(stream, checkpoint);
+//             return R.failure(.{
+//                 .backtrack = last_err.?,
+//             }, stream);
+//         }
+//     }.inline_parser;
+// }
 
-pub const alt_a_b = Alt(ParserStream([]const u8), u8, Utf8Error, &.{ a, b });
+// pub const alt_a_b = Alt(ParserStream([]const u8), u8, Utf8Error, &.{ a, b });
 
 // pub fn Many(comptime S: type, comptime V: type, comptime P: *const fn (S, std.mem.Allocator) anyerror!Result(S, V, Error(V))) ParserUtf8([]u8, u8) {
 //     return struct {
@@ -214,16 +287,16 @@ const ResolvedSpan = struct {
     end: usize,
 };
 
-fn resolve_span(err: Utf8Error, stream: ParserStream([]const u8)) ResolvedSpan {
-    const src = stream.data;
-    const offset = err.start orelse 0;
+fn resolve_span(err: Utf8Error, stream: Utf8ReaderStream) ResolvedSpan {
+    const src = stream.bytes.items;
+    const offset = err.start orelse .begin;
 
     var line: usize = 1;
     var col: usize = 1;
     var line_start: usize = 0;
 
     var i: usize = 0;
-    while (i < offset and i < src.len) : (i += 1) {
+    while (i < @intFromEnum(offset) and i < src.len) : (i += 1) {
         if (src[i] == '\n') {
             line += 1;
             col = 1;
@@ -241,8 +314,8 @@ fn resolve_span(err: Utf8Error, stream: ParserStream([]const u8)) ResolvedSpan {
         .col = col,
         .line_start = line_start,
         .line_end = line_end,
-        .start = offset,
-        .end = err.end orelse offset,
+        .start = @intFromEnum(offset),
+        .end = @intFromEnum(err.end orelse offset),
     };
 }
 
@@ -261,11 +334,11 @@ fn render_source_line(src: []const u8, span: ResolvedSpan) void {
     }
 }
 
-pub fn render_error(stream: ParserStream([]const u8), stream_name: ?[]const u8, err: Utf8Error) void {
+pub fn render_error(stream: Utf8ReaderStream, stream_name: ?[]const u8, err: Utf8Error) void {
     const span = resolve_span(err, stream);
 
     std.debug.print("{s} --> line {}, col {}\n", .{ if (stream_name) |s| s else "null", span.line, span.col });
-    render_source_line(stream.data, span);
+    render_source_line(stream.bytes.items, span);
 
     if (err._unexpected) |unexpected| {
         switch (unexpected) {
@@ -303,17 +376,24 @@ pub fn main() !void {
 
     const parser_allocator = arena.allocator();
 
-    const stream: ParserStream([]const u8) = .init("b");
+    //var fixed = std.Io.Reader.fixed("stran");
+
+    var content: std.array_list.Aligned(u8, null) = .empty;
+    //const stream: Utf8ReaderStream = .init_partial(allocator, &fixed, &content);
+    try content.appendSlice(allocator, "stran");
+    const stream: Utf8ReaderStream = .init_fixed(allocator, &content);
+
+    defer content.deinit(allocator);
 
     // TODO: Provide a `parse` function that handles the creation of the arena
-    switch (try alt_a_b(stream, parser_allocator)) {
+    switch (try string(stream, parser_allocator)) {
         .Result => |r| {
             std.log.debug("Success: {any}", .{r});
             // allocator.free(r.value);
         },
         .Error => |e| {
             render_error(stream, "<input>", if (e.msg == .backtrack) e.msg.backtrack else e.msg.fatal);
-            //std.log.debug("Failure: {any}", .{e});
+            //std.log.debug("Failure: {any} : {s}", .{ e, e.rest.bytes.items });
         },
     }
 }

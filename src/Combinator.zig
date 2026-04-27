@@ -63,7 +63,7 @@ pub fn many1(stream: Stream, allocator: std.mem.Allocator, state: State, comptim
                 s = res.rest;
                 try array.append(res.value);
             },
-            .Error => |_| {
+            .Error => {
                 r.Error.msg.deinit(allocator);
                 break;
             },
