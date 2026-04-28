@@ -34,7 +34,7 @@ pub fn digit(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
 
     if (!std.ascii.isDigit(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
             allocator,
             .{
@@ -62,7 +62,7 @@ pub fn hex_digit(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(S
         '0'...'9', 'A'...'Z', 'a'...'z' => Result(Stream, u8, Error(ParseError)).success(byte, stream.consume(1)),
         else => blk: {
             var err: ParseError = .empty;
-            _ = err.unexpected(.{ .expected_token = byte })
+            _ = err.unexpected(.{ .unexpected_token = byte })
                 .expected(
                 allocator,
                 .{
@@ -89,7 +89,7 @@ pub fn oct_digit(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(S
         '0'...'8' => Result(Stream, u8, Error(ParseError)).success(byte, stream.consume(1)),
         else => blk: {
             var err: ParseError = .empty;
-            _ = err.unexpected(.{ .expected_token = byte })
+            _ = err.unexpected(.{ .unexpected_token = byte })
                 .expected(
                 allocator,
                 .{
@@ -114,7 +114,7 @@ pub fn letter(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Stre
 
     if (!std.ascii.isAlphabetic(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
             allocator,
             .{
@@ -140,7 +140,7 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
 
     if (!std.ascii.isWhitespace(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
                 allocator,
                 .{ .expected_token = ' ' },
@@ -172,7 +172,7 @@ pub fn alpha_num(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(S
 
     if (!std.ascii.isAlphanumeric(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
                 allocator,
                 .{ .expected_token = ' ' },
@@ -204,7 +204,7 @@ pub fn upper(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
 
     if (!std.ascii.isUpper(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
                 allocator,
                 .{ .expected_token = ' ' },
@@ -236,7 +236,7 @@ pub fn lower(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
 
     if (!std.ascii.isLower(byte)) {
         var err: ParseError = .empty;
-        _ = err.unexpected(.{ .expected_token = byte })
+        _ = err.unexpected(.{ .unexpected_token = byte })
             .expected(
                 allocator,
                 .{ .expected_token = ' ' },
