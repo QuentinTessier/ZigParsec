@@ -204,16 +204,17 @@ pub fn main() !void {
 
     var content: std.array_list.Aligned(u8, null) = .empty;
     //const stream: Utf8ReaderStream = .init_partial(allocator, &fixed, &content);
-    try content.appendSlice(allocator, "1+2*3*8+3*9");
+    try content.appendSlice(allocator, "    \nif");
     const stream: Utf8Stream = .fixed(allocator, &content);
 
     defer content.deinit(allocator);
 
+    const whitespace_before_identifier = Lang.whitespace_before(Lang._identifier);
     // TODO: Provide a `parse` function that handles the creation of the arena
-    switch (try utf8_expression(stream, parser_allocator)) {
+    switch (try whitespace_before_identifier(stream, parser_allocator)) {
         .result => |r| {
-            print_expression_dot(r.value);
-            //std.log.debug("Success: {any} : {s}", .{ r, r.rest.bytes.items[r.rest.offset..] });
+            //print_expression_dot(r.value);
+            std.log.debug("Success: {any} : {s}", .{ r, r.rest.bytes.items[r.rest.offset..] });
             // allocator.free(r.value);
         },
         .@"error" => |e| {

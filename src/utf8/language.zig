@@ -10,34 +10,43 @@ const Error = @import("../parser/error.zig").Error;
 const Utf8Char = @import("char.zig");
 const Utf8Combinator = @import("../parser/combinator.zig").Combinator(Stream, ParseError);
 
+const ParserResult = @import("../parser/parser.zig").ParserResult;
+
 fn identifier_first_character_predicate(c: u8) bool {
     return c == '_' or std.ascii.isAlphabetic(c);
 }
 
 fn identifier_character_predicate(c: u8) bool {
-    std.log.debug("{c} => {}", .{ c, c == '_' or std.ascii.isAlphanumeric(c) });
     return c == '_' or std.ascii.isAlphanumeric(c);
 }
 
 const identifier_first_character = Utf8Char.Satisfy(identifier_first_character_predicate, "`_` or [A ... Z, a ... z]");
 const identifier_character = Utf8Char.Satisfy(identifier_character_predicate, "`_` or [A ... Z, a ... z, 0 ... 9]");
-const many_identifier_character = Utf8Combinator.Many(identifier_character);
+
+pub fn _identifier_rest(stream: Stream, allocator: std.mem.Allocator, start: Stream.Checkpoint) anyerror!Result(Stream, []const u8, ParseError) {
+    var s = stream;
+
+    while (run: {
+        const res = try identifier_character(s, allocator);
+        switch (res) {
+            .result => |r| {
+                s = r.rest;
+                break :run true;
+            },
+            .@"error" => break :run false,
+        }
+    }) {}
+
+    return Result(Stream, []const u8, ParseError).success(s.slice(start), s);
+}
 
 pub fn _identifier(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Stream, []const u8, ParseError) {
     const checkpoint = stream.checkpoint();
     const first = try identifier_first_character(stream, allocator);
-    switch (first) {
-        .result => |r0| {
-            const remaining = try many_identifier_character(r0.rest, allocator);
-            switch (remaining) {
-                .result => |r1| {
-                    return Result(Stream, []const u8, ParseError).success(r1.rest.slice(checkpoint), r1.rest);
-                },
-                .@"error" => unreachable,
-            }
-        },
-        .@"error" => |e| return Result(Stream, []const u8, ParseError).failure(e.value, e.rest),
-    }
+    return switch (first) {
+        .result => |r0| _identifier_rest(r0.rest, allocator, checkpoint),
+        .@"error" => |e| Result(Stream, []const u8, ParseError).failure(e.value, e.rest),
+    };
 }
 
 pub fn Identifier(comptime Reserved: []const []const u8) Utf8Parser([]const u8) {
@@ -61,6 +70,24 @@ pub fn Identifier(comptime Reserved: []const []const u8) Utf8Parser([]const u8) 
                 },
                 .@"error" => return identifier,
             }
+        }
+    }.inline_parser;
+}
+
+pub fn whitespace_before(comptime P: anytype) blk: {
+    const PResult = ParserResult(@TypeOf(P));
+    const ValueType = PResult.ValueType;
+
+    break :blk Utf8Parser(ValueType);
+} {
+    return struct {
+        const PResult = ParserResult(@TypeOf(P));
+        const ValueType: type = PResult.ValueType;
+        const R = Result(Stream, ValueType, ParseError);
+
+        pub fn inline_parser(stream: Stream, allocator: std.mem.Allocator) anyerror!R {
+            const s = (try Utf8Char.spaces(stream, allocator)).stream();
+            return P(s, allocator);
         }
     }.inline_parser;
 }

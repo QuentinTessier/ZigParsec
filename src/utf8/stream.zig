@@ -97,5 +97,5 @@ pub fn slice(self: *const Stream, start: Checkpoint) []const u8 {
         else => @intFromEnum(start),
     };
 
-    return self.bytes.items[start_usize..self.bytes.items.len];
+    return self.bytes.items[start_usize..self.offset];
 }

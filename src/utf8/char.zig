@@ -159,6 +159,20 @@ pub fn space(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
     }
 }
 
+pub fn spaces(stream: Stream, _: std.mem.Allocator) anyerror!Result(Stream, void, ParseError) {
+    var s: Stream = stream;
+    while (run: {
+        const byte = s.peek() catch |e| switch (e) {
+            error.EndOfStream => break :run false,
+            else => return e,
+        };
+
+        break :run std.ascii.isWhitespace(byte);
+    }) : (s = s.consume(1)) {}
+
+    return Result(Stream, void, ParseError).success(void{}, s);
+}
+
 pub fn alpha_num(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Stream, u8, ParseError) {
     const checkpoint = stream.checkpoint();
     const byte = stream.peek() catch |e| switch (e) {
@@ -253,6 +267,20 @@ pub fn lower(stream: Stream, allocator: std.mem.Allocator) anyerror!Result(Strea
     } else {
         return Result(Stream, u8, ParseError).success(byte, stream.consume(1));
     }
+}
+
+pub fn eof(stream: Stream, _: std.mem.Allocator) anyerror!Result(Stream, void, ParseError) {
+    const byte = stream.peek() catch |e| switch (e) {
+        error.EndOfStream => {
+            return Result(Stream, void, ParseError).success(void{}, stream);
+        },
+        else => return e,
+    };
+
+    const checkpoint = stream.checkpoint();
+    var err: ParseError = .empty;
+    _ = err.append(stream, checkpoint).unexpected(.{ .expected_token = byte });
+    return Result(Stream, void, ParseError).failure(.{ .backtrack = err }, stream.consume(1));
 }
 
 pub fn Char(comptime C: u8) Utf8Parser(u8) {
@@ -356,10 +384,8 @@ pub fn Satisfy(comptime Pred: *const fn (u8) bool, comptime message: ?[]const u8
             };
 
             if (Pred(byte)) {
-                std.log.debug("Predicate is valid for {c}", .{byte});
                 return R.success(byte, stream.consume(1));
             } else {
-                std.log.debug("Predicate is invalid for {c}", .{byte});
                 var err: ParseError = .empty;
                 _ = err.unexpected(.{ .unexpected_token = byte })
                     .append(stream.consume(1), checkpoint);
