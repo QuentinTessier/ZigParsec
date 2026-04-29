@@ -15,8 +15,8 @@ pub fn ExpressionParserGenerator(comptime S: type, comptime ExprT: type, comptim
 
         pub fn build_expression_parser(comptime op_table: OperatorTable, comptime termP: Parser(S, ExprT, E)) Parser(S, ExprT, E) {
             return struct {
-                const R = Result(S, ExprT, Error(E));
-                const PrattPrefixResult = Result(S, PrefixOperator, Error(E));
+                const R = Result(S, ExprT, E);
+                const PrattPrefixResult = Result(S, PrefixOperator, E);
                 fn pratt_prefix_op(stream: S, allocator: std.mem.Allocator) anyerror!PrattPrefixResult {
                     const operators = op_table.prefix;
                     inline for (operators) |p| {
@@ -30,7 +30,7 @@ pub fn ExpressionParserGenerator(comptime S: type, comptime ExprT: type, comptim
                     return PrattPrefixResult.success(PrefixOperator.id(), stream);
                 }
 
-                const PrattPostfixResult = Result(S, PostfixOperator, Error(E));
+                const PrattPostfixResult = Result(S, PostfixOperator, E);
                 fn pratt_postfix_op(stream: S, allocator: std.mem.Allocator) anyerror!PrattPostfixResult {
                     const operators = op_table.postfix;
                     inline for (operators) |p| {
@@ -44,7 +44,7 @@ pub fn ExpressionParserGenerator(comptime S: type, comptime ExprT: type, comptim
                     return PrattPostfixResult.success(PostfixOperator.id(), stream);
                 }
 
-                const PrattInfixResult = Result(S, InfixOperator, Error(E));
+                const PrattInfixResult = Result(S, InfixOperator, E);
                 fn pratt_infix_op(stream: S, allocator: std.mem.Allocator) anyerror!PrattInfixResult {
                     const checkpoint = stream.checkpoint();
                     const operators = op_table.infix;

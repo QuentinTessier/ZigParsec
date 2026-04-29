@@ -2,7 +2,9 @@ const std = @import("std");
 const Utf8Stream = @import("utf8/stream.zig").Stream;
 const Utf8Error = @import("utf8/error.zig").ParseError;
 const Utf8Char = @import("utf8/char.zig");
-const Utf8Comb = @import("utf8/combinator.zig");
+
+const Utf8Comb = @import("parser/combinator.zig").Combinator(Utf8Stream, Utf8Error);
+const Lang = @import("utf8/language.zig");
 
 const Result = @import("parser/result.zig").Result;
 const Error = @import("parser/error.zig").Error;
@@ -37,6 +39,14 @@ pub const Expression = union(enum) {
     }
 };
 
+const A = Utf8Char.Char('A');
+const Open = Utf8Char.Char('(');
+const Close = Utf8Char.Char(')');
+const Comma = Utf8Char.Char(',');
+const ManyA = Utf8Comb.Many(A);
+const SeqBy = Utf8Comb.SepBy1(Comma, A);
+const Between = Utf8Comb.Between(Open, Close, SeqBy);
+
 fn print_expression_node(expr: *const Expression, id: *u32) u32 {
     const self_id = id.*;
     id.* += 1;
@@ -65,7 +75,7 @@ pub fn print_expression_dot(expr: *const Expression) void {
 
 const Utf8Expression = @import("expression/generator.zig").ExpressionParserGenerator(Utf8Stream, *Expression, Utf8Error);
 
-pub const Utf8ExpressionResult = Result(Utf8Stream, *Expression, Error(Utf8Error));
+pub const Utf8ExpressionResult = Result(Utf8Stream, *Expression, Utf8Error);
 
 pub fn term(stream: Utf8Stream, allocator: std.mem.Allocator) anyerror!Utf8ExpressionResult {
     const digit = try Utf8Char.digit(stream, allocator);
@@ -82,16 +92,10 @@ pub fn term(stream: Utf8Stream, allocator: std.mem.Allocator) anyerror!Utf8Expre
 pub const addP = Utf8Char.String("+");
 pub const mulP = Utf8Char.String("*");
 
-pub fn wrapped_add_p(stream: Utf8Stream, allocator: std.mem.Allocator) anyerror!Result(Utf8Stream, []const u8, Error(Utf8Error)) {
-    // const remaining = stream.bytes.items[stream.offset..];
-    // std.log.debug("{s}", .{remaining});
-
-    return addP(stream, allocator);
-}
-
+// Simply parses digit with '+' and '*' in between
 const utf8_expression = Utf8Expression.build_expression_parser(.{
     .infix = &.{
-        Utf8Expression.InfixOperator.new(wrapped_add_p, .{ .assoc = .left, .value = 60 }, Expression.make_bin_operator_builder(.add)),
+        Utf8Expression.InfixOperator.new(addP, .{ .assoc = .left, .value = 60 }, Expression.make_bin_operator_builder(.add)),
         Utf8Expression.InfixOperator.new(mulP, .{ .assoc = .left, .value = 70 }, Expression.make_bin_operator_builder(.mul)),
     },
     .prefix = &.{},
@@ -200,7 +204,7 @@ pub fn main() !void {
 
     var content: std.array_list.Aligned(u8, null) = .empty;
     //const stream: Utf8ReaderStream = .init_partial(allocator, &fixed, &content);
-    try content.appendSlice(allocator, "1+2*3");
+    try content.appendSlice(allocator, "1+2*3*8+3*9");
     const stream: Utf8Stream = .fixed(allocator, &content);
 
     defer content.deinit(allocator);

@@ -83,3 +83,19 @@ pub fn backtrack(self: *const Stream, c: Checkpoint) Stream {
         .allocator = self.allocator,
     };
 }
+
+pub fn log_remaining(self: *const Stream, label: []const u8) Stream {
+    const remaining = self.bytes.items[self.offset..];
+    std.log.debug("{s} -> [ {s} ]", .{ label, remaining });
+    return self.*;
+}
+
+pub fn slice(self: *const Stream, start: Checkpoint) []const u8 {
+    const start_usize: usize = switch (start) {
+        .begin => 0,
+        .end => self.bytes.items.len - 1,
+        else => @intFromEnum(start),
+    };
+
+    return self.bytes.items[start_usize..self.bytes.items.len];
+}

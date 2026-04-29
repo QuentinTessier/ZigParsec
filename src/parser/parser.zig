@@ -4,7 +4,7 @@ const Result = @import("result.zig").Result;
 const Error = @import("error.zig").Error;
 
 pub fn Parser(comptime S: type, comptime V: type, comptime E: type) type {
-    return *const fn (S, std.mem.Allocator) anyerror!Result(S, V, Error(E));
+    return *const fn (S, std.mem.Allocator) anyerror!Result(S, V, E);
 }
 
 fn UnwrapError(comptime R: type) type {

@@ -45,7 +45,7 @@ pub fn OperatorTableGenerator(comptime S: type, comptime ExprT: type, comptime E
 
             pub fn new(comptime P: anytype, comptime precedence: Precedence, comptime builder: InfixOperatorB) InfixOperatorP {
                 return struct {
-                    const R = Result(S, InfixOperator, Error(E));
+                    const R = Result(S, InfixOperator, E);
                     pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
                         const res = try P(stream, allocator);
                         return switch (res) {
@@ -80,7 +80,7 @@ pub fn OperatorTableGenerator(comptime S: type, comptime ExprT: type, comptime E
 
             pub fn new(comptime P: anytype, comptime builder: PrefixOperatorB) PrefixOperatorP {
                 return struct {
-                    const R = Result(S, PrefixOperator, Error(E));
+                    const R = Result(S, PrefixOperator, E);
                     pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
                         const res = try P(stream, allocator);
                         return switch (res) {
@@ -114,7 +114,7 @@ pub fn OperatorTableGenerator(comptime S: type, comptime ExprT: type, comptime E
 
             pub fn new(comptime P: anytype, comptime builder: PostfixOperatorB) PostfixOperatorP {
                 return struct {
-                    const R = Result(S, PostfixOperator, Error(E));
+                    const R = Result(S, PostfixOperator, E);
                     pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
                         const res = try P(stream, allocator);
                         return switch (res) {
