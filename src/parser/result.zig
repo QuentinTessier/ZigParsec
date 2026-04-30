@@ -30,5 +30,12 @@ pub fn Result(comptime S: type, comptime V: type, comptime E: type) type {
                 .@"error" => |val| val.rest,
             };
         }
+
+        pub fn map(self: *const @This(), comptime U: type, allocator: std.mem.Allocator, f: *const fn (allocator: std.mem.Allocator, value: V) anyerror!U) anyerror!Result(S, U, E) {
+            return switch (self.*) {
+                .@"error" => |err| Result(S, U, E).failure(err.value, err.rest),
+                .result => |res| Result(S, U, E).success(try f(allocator, res.value), res.rest),
+            };
+        }
     };
 }

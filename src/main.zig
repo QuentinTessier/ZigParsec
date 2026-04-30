@@ -209,9 +209,8 @@ pub fn main() !void {
 
     defer content.deinit(allocator);
 
-    const whitespace_before_identifier = Lang.whitespace_before(Lang._identifier);
     // TODO: Provide a `parse` function that handles the creation of the arena
-    switch (try whitespace_before_identifier(stream, parser_allocator)) {
+    switch (try Lang.whitespace_before(stream, parser_allocator, Lang._identifier)) {
         .result => |r| {
             //print_expression_dot(r.value);
             std.log.debug("Success: {any} : {s}", .{ r, r.rest.bytes.items[r.rest.offset..] });

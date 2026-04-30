@@ -4,6 +4,74 @@ const Result = @import("result.zig").Result;
 
 pub fn Combinator(comptime S: type, comptime E: type) type {
     return struct {
+        pub fn Alt(comptime Ps: anytype) blk: {
+            const PResult = parser.ParserResult(@TypeOf(Ps[0]));
+            const ValueType = PResult.ValueType;
+            break :blk parser.Parser(S, ValueType, E);
+        } {
+            const R = parser.ParserResult(@TypeOf(Ps[0]));
+
+            return struct {
+                pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
+                    const checkpoint = stream.checkpoint();
+                    var last_err: ?E = null;
+
+                    inline for (Ps) |p| {
+                        const res = try p(stream, allocator);
+                        switch (res) {
+                            .result => return res,
+                            .@"error" => |err| switch (err.value) {
+                                .fatal => return res,
+                                .backtrack => |inner| {
+                                    if (last_err != null) {
+                                        _ = last_err.?.@"or"(allocator, &inner);
+                                    } else last_err = inner;
+                                },
+                            },
+                        }
+                    }
+
+                    _ = last_err.?.append(stream, checkpoint);
+                    return R.failure(.{
+                        .backtrack = last_err.?,
+                    }, stream);
+                }
+            }.inline_parser;
+        }
+
+        pub fn AltUnion(comptime U: type, comptime Ps: anytype) type {
+            const R = parser.ParserResult(U);
+
+            return struct {
+                pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
+                    const checkpoint = stream.checkpoint();
+                    var last_err: ?E = null;
+
+                    inline for (Ps) |fp| {
+                        const field = fp[0];
+                        const p = fp[1];
+                        const res = try p(stream, allocator);
+                        switch (res) {
+                            .result => return R.success(@unionInit(U, @tagName(field), res.value)),
+                            .@"error" => |err| switch (err.value) {
+                                .fatal => return res,
+                                .backtrack => |inner| {
+                                    if (last_err != null) {
+                                        _ = last_err.?.@"or"(allocator, &inner);
+                                    } else last_err = inner;
+                                },
+                            },
+                        }
+                    }
+
+                    _ = last_err.?.append(stream, checkpoint);
+                    return R.failure(.{
+                        .backtrack = last_err.?,
+                    }, stream);
+                }
+            }.inline_parser;
+        }
+
         pub fn Many(comptime P: anytype) blk: {
             const PResult = parser.ParserResult(@TypeOf(P));
             const ValueType = PResult.ValueType;

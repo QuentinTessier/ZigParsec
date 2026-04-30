@@ -91,3 +91,29 @@ pub fn whitespace_before(comptime P: anytype) blk: {
         }
     }.inline_parser;
 }
+
+pub fn Operator(comptime Symbol: []const u8, comptime NotFollowedBy: ?[]const u8) Utf8Parser([]const u8) {
+    const S = Utf8Char.String(Symbol);
+    const F: ?Utf8Parser([]const u8) = if (NotFollowedBy) |not_followed_by| Utf8Char.String(not_followed_by) else null;
+
+    return struct {
+        const R = Result(Stream, []const u8, ParseError);
+
+        pub fn inline_parser(stream: Stream, allocator: std.mem.Allocator) anyerror!R {
+            const match = try S(stream, allocator);
+
+            return switch (match) {
+                .result => |r0| if (F) |parser| switch (try parser(r0.rest, allocator)) {
+                    .result => |r1| blk: {
+                        var err: ParseError = .empty;
+
+                        _ = err.expected(allocator, .{ .expected_range = Symbol });
+                        break :blk R.failure(.{ .backtrack = err }, r1.rest);
+                    },
+                    .@"error" => match,
+                } else match,
+                .@"error" => |err| R.failure(err.value, err.rest),
+            };
+        }
+    }.inline_parser;
+}
