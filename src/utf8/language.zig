@@ -63,9 +63,9 @@ pub fn Identifier(comptime Reserved: []const []const u8) Utf8Parser([]const u8) 
                             _ = err.unexpected(.{ .unexpected_message = "reserved keyword `" ++ keyword ++ "`" })
                                 .append(stream.consume(1), checkpoint);
                             return R.failure(.{ .backtrack = err }, stream);
-                        } else {
-                            return identifier;
                         }
+                    } else {
+                        return identifier;
                     }
                 },
                 .@"error" => return identifier,

@@ -21,3 +21,23 @@ pub fn ParserResult(comptime P: type) type {
         else => @compileError("Expected a function or a function pointer"),
     }
 }
+
+pub fn Fatal(comptime S: type, comptime P: anytype, comptime E: type) blk: {
+    const PResult = ParserResult(@TypeOf(P));
+    const ValueType = PResult.ValueType;
+    break :blk Parser(S, ValueType, E);
+} {
+    const PResult = ParserResult(@TypeOf(P));
+    const ValueType = PResult.ValueType;
+    const R = Result(S, ValueType, E);
+
+    return struct {
+        pub fn inline_parser(stream: S, allocator: std.mem.Allocator) anyerror!R {
+            const res: R = try P(stream, allocator);
+            return switch (res) {
+                .result => res,
+                .@"error" => |err| R.failure(err.value.promote(), err.rest),
+            };
+        }
+    }.inline_parser;
+}

@@ -1,5 +1,8 @@
 pub const Parser = @import("parser/parser.zig").Parser;
+pub const ParserResult = @import("parser/parser.zig").ParserResult;
+pub const Fatal = @import("parser/parser.zig").Fatal;
 pub const Result = @import("parser/result.zig").Result;
+pub const ErrorPayload = @import("parser/result.zig").ErrorPayload;
 pub const Combinator = @import("parser/combinator.zig").Combinator;
 pub const Expr = @import("expression/generator.zig");
 
